@@ -1,1 +1,10 @@
-pip install flask gunicorn pymysql python-dotenv boto3
+flask
+gunicorn
+pymysql
+python-dotenv
+boto3
+flask-cors
+opencv-python
+paho-mqtt
+AWSIoTPythonSDK
+
