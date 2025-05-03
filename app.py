@@ -3,11 +3,12 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import time
 import cv2
-import paho.mqtt.client as mqtt
+#import paho.mqtt.client as mqtt
 
 # 기존 블루프린트 import
 from routes.user import user_bp
 from routes.dog import dog_bp
+from routes.device import device_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -15,6 +16,7 @@ CORS(app)
 # —————— 블루프린트 등록 ——————
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(dog_bp, url_prefix='/api')
+app.register_blueprint(device_bp, url_prefix='/api')
 
 # —————— 전역 상태 ——————
 camera_on = False
@@ -23,12 +25,14 @@ mic_on = False
 # OpenCV 비디오 캡처 (Raspberry Pi 카메라 또는 USB 카메라)
 video_capture = cv2.VideoCapture(0)
 
+''' 주석처리 이유 : AWS의 IoTCore를 사용
 # MQTT 설정 (IoT 디바이스 제어용)
 MQTT_BROKER = "YOUR_MQTT_BROKER_IP"
 MQTT_PORT   = 1883
 mqtt_client = mqtt.Client()
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
+'''
 
 # —————— 비디오 스트리밍 제너레이터 ——————
 def gen_frames():
