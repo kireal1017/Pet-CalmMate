@@ -76,6 +76,7 @@ def toggle_mic():
     mic_on = not mic_on
     return jsonify({'mic_on': mic_on})
 
+''' mqtt가 아닌 iotcore 사용해야함 
 @app.route('/api/dispense-snack', methods=['POST'])
 def dispense_snack():
     """간식 디스펜서에 MQTT 명령 발행"""
@@ -84,7 +85,7 @@ def dispense_snack():
         return jsonify({'success': True, 'message': '간식을 지급했습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
+'''
 if __name__ == '__main__':
     # 디버그 모드 + 전체 인터페이스에서 접근 허용
     app.run(host='0.0.0.0', port=5000, debug=True)
