@@ -1,14 +1,9 @@
 # routes/device.py
 from flask import Blueprint, jsonify, Response, request
 import cv2, time
-import paho.mqtt.client as mqtt
+from mqtt_iotcore import send_mqtt_message
 
 device_bp = Blueprint('device', __name__)
-
-# MQTT 설정
-mqtt_client = mqtt.Client()
-mqtt_client.connect("localhost", 1883, 60)
-mqtt_client.loop_start()
 
 camera_on = False
 video_capture = cv2.VideoCapture(0)
@@ -25,5 +20,13 @@ def toggle_mic():
 
 @device_bp.route('/dispense-snack', methods=['POST'])
 def dispense_snack():
-    mqtt_client.publish("pet/dispense", payload="SNACK", qos=1)
-    return jsonify({"success": True, "message": "MQTT 간식 신호 발행 완료"})
+    data = request.get_json()
+    dog_id = data.get('dog_id')
+    if not dog_id:
+        return jsonify({'error': 'dog_id is required'}), 400
+
+    topic = f"nyangmeong/dog{dog_id}/dispense"
+    message = "SNACK"
+    send_mqtt_message(topic, message)
+
+    return jsonify({'message': f'Snack dispense command sent to dog {dog_id}.'}), 200
