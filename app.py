@@ -9,6 +9,7 @@ from routes.device import device_bp
 from routes.camera import camera_bp
 from routes.mic    import mic_bp
 from routes.walk   import walk_bp
+from routes.group  import group_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -21,6 +22,7 @@ app.register_blueprint(device_bp, url_prefix='/api')
 app.register_blueprint(camera_bp, url_prefix='/api')
 app.register_blueprint(mic_bp,    url_prefix='/api')
 app.register_blueprint(walk_bp,  url_prefix='/api')
+app.register_blueprint(group_bp, url_prefix='/api')
 
 if __name__ == '__main__':
     # 0.0.0.0:5000 으로 바인딩 (외부 접속 허용)
