@@ -1,23 +1,6 @@
-#----------------------- AWS IoT Core -----------------------
-ENDPOINT =
-CLIENT_ID =
-PATH_TO_CERT =
-PATH_TO_KEY =
-PATH_TO_ROOT =
+from aws_privatekey import * # 예민한 정보는 별도 보관할 것
 
-#-------------------------AWS S3--------------------------------
-
-S3_AWS_ACCESS_KEY_ID =
-S3_AWS_SECRET_ACCESS_KEY =
-S3_BUCKET_NAME =
-S3_PREFIX =
-S3_REGION_NAME =
-
-
-# 예민한 정보는 별도 보관할 것
-
-# 입력받고 보낼 메세지 토픽, 나중에는 각자 따로 받아야함
-#-------------------------------------------------------------
+# 입력받고 보낼 메세지 토픽
 TOPIC_STATUS  = "rpi/status"
 TOPIC_MIC     = "mic/upload" # <- 현재 이거는 아직 안씀
 TOPIC_CONTROL = "cmd/control"
@@ -27,63 +10,80 @@ from awscrt import io, mqtt, auth, http
 from awsiot import mqtt_connection_builder
 # AWS 연동
 
+from serial.tools import list_ports
 
-import time, json, threading, subprocess, serial, pyaudio, wave, boto3, pyaudio, wave, datetime
-import io as std_io
+import time, json, threading, subprocess, serial, pyaudio, wave, boto3, datetime, glob
+import io as std_io #aws io랑 겹쳐서 별도로 이름 넣음, 레코딩에 쓰이는 io임
+
 
 #-------------------------------------------------------------
 
 # IoT 제어 클래스
 
-class controller:
-    def __init__(self):
-        self.mqtt_connection = None
-        self.is_connected = False
-        self.is_subscribed = False
+class Controller:
+    def __init__(self, mqtt_connection, topic_status=TOPIC_STATUS):
+        self.mqtt_connection = mqtt_connection
+        self.topic_status = topic_status
         self.is_streaming = False
-        self.PORT = '/dev/ttyACM0'   # 아두이노 포트
+        self.camera_process = None
+        
+        self.PORT = "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_8573531323335120D132-if00"   # 아두이노 포트
         self.BAUD = 9600             # 시리얼 통신 속도
         self.TIMEOUT = 1             # usb하고 연결 안됬을 때의 Time out
-        self.nowtime = datetime.now() #현재 시간 측정
-        pass
-
+        
+    
+    def on_message_received(self, topic, payload, **kwargs):
+        try:
+            data = json.loads(payload.decode())
+            # process() 호출
+            response = self.process(data)
+            if response:
+                # 퍼블리시
+                self.mqtt_connection.publish(
+                    topic=self.topic_status,
+                    payload=json.dumps(response),
+                    qos=mqtt.QoS.AT_LEAST_ONCE
+                )
+                print("응답 전송:", response)
+        except json.JSONDecodeError:
+            print("Invalid JSON:", payload)
+            
+    
     def process(self, payload:dict) -> dict:
         command = payload.get("message")
+        nowtime = datetime.datetime.now()
+        time_stamp = {
+            "date": nowtime.date().isoformat(),
+            "time": nowtime.time().strftime("%H:%M:%S")
+        }
+        
         if command == "snack":
             self.snack_signal()
-            print("간식 주기 신호 전송 완료")
-            return {"status":"snack_give", 
-                    "date": self.nowtime.date().isoformat(), 
-                    "time": self.nowtime.time().strftime("%H:%M:%S") }
+            return {"status":"snack_give", **time_stamp}
         
         elif command == "camera_on":
             self.start_camera_stream()
             self.is_streaming = True
-            print("카메라 스트리밍 시작")
-            return {"status":"rpi_camera_on", 
-                    "date": self.nowtime.date().isoformat(),
-                    "time": self.nowtime.time().strftime("%H:%M:%S") }
+            return {"status":"rpi_camera_on", **time_stamp}
             
         elif command == "camera_off":
             self.stop_camera_stream()
             self.is_streaming = False
-            print("카메라 스트리밍 종료")
-            return {"status":"rpi_camera_off", 
-                    "date": self.nowtime.date().isoformat(), 
-                    "time": self.nowtime.time().strftime("%H:%M:%S") }
+            return {"status":"rpi_camera_off", **time_stamp}
             
         elif command == "speaker":
             self.play_speaker()
-            print("스피커 재생")
-            return {"status":"user_sound", 
-                    "date": self.nowtime.date().isoformat(), 
-                    "time": self.nowtime.time().strftime("%H:%M:%S") }
+
+            return {"status":"user_sound", **time_stamp}
             
         else:
-            print("알 수 없는 명령어입니다.")
+            print("알 수 없는 명령어")
+            return {"status":"unknown_command", **time_stamp}
+            
             
     def play_speaker(self):
         # 스피커 재생 코드
+        print("사용자 목소리 재생")
         pass
     
     def stop_camera_stream(self):
@@ -102,18 +102,22 @@ class controller:
         "! video/x-h264,stream-format=avc,alignment=au,profile=baseline "
         "! kvssink stream-name=rpi-video"
         )
-        subprocess.Popen(pipeline, shell=True, executable="/bin/bash")
-    
-        # 로그 확인 (출력된 로그에서 'streaming started' 메시지를 찾음)
-        stdout, stderr = process.communicate()
-        if "streaming started" in stdout.decode() or "stream is ready" in stdout.decode():
-            print("스트리밍이 시작")
-        else:
-            print("스트리밍 오류:", stderr.decode())
         
+        self.camera_process = subprocess.Popen(
+            pipeline, 
+            shell=True, 
+            executable="/bin/bash",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+            )
+        
+        print(f"[INFO] Camera streaming started (PID {self.camera_process.pid})")
+        
+    
     
     def snack_signal(self):                                     # 간식 주기 신호
         """ 포트 연결 > 전송 > 포트 닫기 순으로 동작함 """
+    
         try:
             ser = serial.Serial(self.PORT, self.BAUD, timeout=self.TIMEOUT)
             time.sleep(2)
@@ -129,7 +133,7 @@ class controller:
 # 녹음 및 S3 업로드 클래스
 # 파라미터(엑세스키, 시크릿키, 버킷이름, 리전이름=기본 아시아, S3 프리픽스)
 
-class recording:
+class Recording:
     def __init__(self, aws_access_key, aws_secret_key, bucket_name, region_name='ap-northeast-2', s3_prefix='recordings/'):
         self.s3 = boto3.client(
             's3',
@@ -206,44 +210,6 @@ class recording:
         print("✅ 녹음 종료 완료.")
 
 
-# ------------------------------------------------------------- json 메세지 수신 시 콜백백
-
-def on_message_received(topic, payload, **kwargs):
-    print(f"[DEBUG] topic={topic}, retained={kwargs.get('is_retained')}, payload={payload}")
-    try:
-        # 받은 메시지 디코딩 및 JSON 파싱
-        decoded = payload.decode()
-        data = json.loads(decoded)
-        print(data['message'])
-        
-        if data['message'] == "snack" and data.get('success') is True:
-            # threading.Thread(target=snack_signal).start()  # 스레드로 LED 켜기 <- 비동기 처리
-            print("간식 주기")
-            
-        elif data['message'] == "camera_on":  # 카메라 메시지 수신
-            # start_camera_stream()  # 카메라 스트리밍 시작
-            print("카메라 스트리밍 시작")
-            
-        elif data['message'] == "camera_off":  # 카메라 끄기
-            # stop_camera_stream()  # 카메라 스트리밍 종료
-            print("카메라 스트리밍 종료")
-        
-        
-        # 응답 JSON 구성
-        
-
-        # 응답 메시지 전송
-        mqtt_connection.publish(
-            topic=TOPIC_STATUS,
-            payload=json.dumps(response),
-            qos=mqtt.QoS.AT_LEAST_ONCE
-        )
-        print(f"메세지 전송 \n{RESPONSE_TOPIC} \n{response}")
-
-    except json.JSONDecodeError:
-        print("is not JSON FILE:", payload)
-
-
 #------------------------------------------------------------- 여기부터 메인
 
 def main():
@@ -252,6 +218,7 @@ def main():
     host_resolver = io.DefaultHostResolver(event_loop_group)
     client_bootstrap = io.ClientBootstrap(event_loop_group, host_resolver)
 
+    # MQTT 연결 설정
     mqtt_connection = mqtt_connection_builder.mtls_from_path(
         endpoint=ENDPOINT,
         cert_filepath=PATH_TO_CERT,
@@ -263,11 +230,11 @@ def main():
     )
 
     # 연결 시도
-    print("conntecting aws iot")
+    print("conntecting aws iot core")
     mqtt_connection.connect().result()
     print("connected")
     
-    recorder = recording(
+    recorder = Recording(
         aws_access_key=S3_AWS_ACCESS_KEY_ID,
         aws_secret_key=S3_AWS_SECRET_ACCESS_KEY,
         bucket_name=S3_BUCKET_NAME
@@ -275,6 +242,9 @@ def main():
     
     recorder.start(record_seconds=2)  # 2초 간격으로 녹음 -> 업로드 파이프라인 가동
     
+    
+    cont = Controller(mqtt_connection)
+        
     mqtt_connection.publish(
         topic=TOPIC_STATUS,
         payload=json.dumps({"status":"ready"}),
@@ -284,10 +254,16 @@ def main():
     # 구독중인 메세지들
     
     mqtt_connection.subscribe(
-        topic=TOPIC_CONTROL, qos=mqtt.QoS.AT_LEAST_ONCE, callback=on_message_received
+        topic=TOPIC_CONTROL,
+        qos=mqtt.QoS.AT_LEAST_ONCE,
+        callback=cont.on_message_received
     )
+
+    # (필요하면 MIC 토픽도 같은 콜백으로)
     mqtt_connection.subscribe(
-        topic=TOPIC_MIC, qos=mqtt.QoS.AT_LEAST_ONCE, callback=on_message_received
+        topic=TOPIC_MIC,
+        qos=mqtt.QoS.AT_LEAST_ONCE,
+        callback=cont.on_message_received
     )
     
 
@@ -295,13 +271,19 @@ def main():
     print("메시지 대기 중")
     try:
         while True:
-            pass
+            time.sleep(1)       # cpu 점유율을 낮추기 위함
     except KeyboardInterrupt:
         print("연결 종료")
+        
+        mqtt_connection.publish(
+        topic=TOPIC_STATUS,
+        payload=json.dumps({"status":"program_off"}),
+        qos=mqtt.QoS.AT_LEAST_ONCE
+        )
+        
         recorder.stop()
+        cont.stop_camera_stream()
         mqtt_connection.disconnect().result()
-
-
 
 
 if __name__ == "__main__":
