@@ -1,7 +1,7 @@
 # routes/device.py
 from flask import Blueprint, jsonify, Response, request
 import cv2, time
-from mqtt_iotcore import send_mqtt_message
+from .mqtt_iotcore import send_mqtt_message
 
 device_bp = Blueprint('device', __name__)
 

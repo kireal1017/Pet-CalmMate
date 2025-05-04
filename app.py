@@ -3,7 +3,6 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import time
 import cv2
-#import paho.mqtt.client as mqtt
 
 # 기존 블루프린트 import
 from routes.user import user_bp
@@ -24,15 +23,6 @@ mic_on = False
 
 # OpenCV 비디오 캡처 (Raspberry Pi 카메라 또는 USB 카메라)
 video_capture = cv2.VideoCapture(0)
-
-''' 주석처리 이유 : AWS의 IoTCore를 사용
-# MQTT 설정 (IoT 디바이스 제어용)
-MQTT_BROKER = "YOUR_MQTT_BROKER_IP"
-MQTT_PORT   = 1883
-mqtt_client = mqtt.Client()
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client.loop_start()
-'''
 
 # —————— 비디오 스트리밍 제너레이터 ——————
 def gen_frames():
@@ -76,16 +66,6 @@ def toggle_mic():
     mic_on = not mic_on
     return jsonify({'mic_on': mic_on})
 
-''' mqtt가 아닌 iotcore 사용해야함 
-@app.route('/api/dispense-snack', methods=['POST'])
-def dispense_snack():
-    """간식 디스펜서에 MQTT 명령 발행"""
-    try:
-        mqtt_client.publish('pet/dispense', payload='SNACK', qos=1)
-        return jsonify({'success': True, 'message': '간식을 지급했습니다.'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-'''
 if __name__ == '__main__':
     # 디버그 모드 + 전체 인터페이스에서 접근 허용
     app.run(host='0.0.0.0', port=5000, debug=True)
