@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
-from db import get_connection
+from db import db
+from models import Dog
 from s3_uploader import upload_file_to_s3
 
 dog_bp = Blueprint('dog', __name__)
@@ -7,29 +8,16 @@ dog_bp = Blueprint('dog', __name__)
 # 🐶 강아지 정보 등록 API
 @dog_bp.route('/dogs', methods=['POST'])
 def add_dog():
-    data = request.get_json()  # 더 안전한 방식
-
-    # 필수 필드 존재 여부 확인
+    data = request.get_json()
     required_fields = ['user_id', 'name', 'breed', 'birth_date', 'gender', 'photo_url']
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
 
-    try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor() as cursor:
-                sql = """
-                    INSERT INTO Dog (user_id, name, breed, birth_date, gender, photo_url)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """
-                cursor.execute(sql, (
-                    data['user_id'], data['name'], data['breed'],
-                    data['birth_date'], data['gender'], data['photo_url']
-                ))
-            conn.commit()
-        return jsonify({'message': 'Dog added successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    new_dog = Dog(**data)
+    db.session.add(new_dog)
+    db.session.commit()
+
+    return jsonify({'message': 'Dog added successfully'})
 
 # 🛠 강아지 정보 수정 API
 @dog_bp.route('/dogs/<int:dog_id>', methods=['PUT'])
@@ -39,44 +27,42 @@ def update_dog(dog_id):
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
 
+    dog = Dog.query.get(dog_id)
+    if not dog:
+        return jsonify({'error': 'Dog not found'}), 404
+
+    dog.name = data['name']
+    dog.breed = data['breed']
+    dog.birth_date = data['birth_date']
+    dog.gender = data['gender']
+    dog.photo_url = data['photo_url']
+
     try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor() as cursor:
-                sql = """
-                    UPDATE Dog SET
-                        name = %s,
-                        breed = %s,
-                        birth_date = %s,
-                        gender = %s,
-                        photo_url = %s
-                    WHERE dog_id = %s
-                """
-                cursor.execute(sql, (
-                    data['name'], data['breed'],
-                    data['birth_date'], data['gender'],
-                    data['photo_url'], dog_id
-                ))
-            conn.commit()
+        db.session.commit()
         return jsonify({'message': 'Dog updated successfully'})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 # 📄 강아지 정보 전체 또는 사용자별 조회 API
 @dog_bp.route('/dogs', methods=['GET'])
 def get_dogs():
-    user_id = request.args.get('user_id')  # ?user_id=5 쿼리 지원
+    user_id = request.args.get('user_id')
 
     try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor() as cursor:
-                if user_id:
-                    cursor.execute("SELECT * FROM Dog WHERE user_id = %s", (user_id,))
-                else:
-                    cursor.execute("SELECT * FROM Dog")
-                dogs = cursor.fetchall()
-        return jsonify(dogs)
+        query = Dog.query
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+
+        dogs = query.all()
+        return jsonify([{
+            'dog_id': dog.dog_id,
+            'name': dog.name,
+            'breed': dog.breed,
+            'birth_date': dog.birth_date.isoformat(),
+            'gender': dog.gender,
+            'photo_url': dog.photo_url
+        } for dog in dogs])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
