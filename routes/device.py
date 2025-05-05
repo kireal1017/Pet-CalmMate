@@ -25,8 +25,8 @@ def dispense_snack():
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
 
-    topic = f"nyangmeong/dog{dog_id}/dispense"
-    message = "SNACK"
+    topic = f"cmd/control"
+    message = "snack"
     send_mqtt_message(topic, message)
 
     return jsonify({'message': f'Snack dispense command sent to dog {dog_id}.'}), 200
