@@ -1,6 +1,6 @@
 # routes/device.py
 from flask import Blueprint, jsonify, Response, request
-import cv2, time
+import cv2, time, json
 from .mqtt_iotcore import send_mqtt_message
 
 device_bp = Blueprint('device', __name__)
@@ -12,8 +12,7 @@ def dispense_snack():
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
 
-    topic = f"cmd/control"
-    message = "snack"
-    send_mqtt_message(topic, message)
+    message = json.dumps({"message": "snack"})
+    send_mqtt_message("cmd/control", message)
 
     return jsonify({'message': f'Snack dispense command sent to dog {dog_id}.'}), 200
