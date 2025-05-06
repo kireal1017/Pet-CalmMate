@@ -1,8 +1,11 @@
 fastapi
 uvicorn
 torch
+torchaudio
+torchvision
+Pillow
 librosa
 noisereduce
 numpy
-scipy
 requests
+scipy
