@@ -1,6 +1,6 @@
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
-def send_mqtt_message(topic, message):
+def send_mqtt_message(topic, message): #mqtt전송 API
     client = AWSIoTMQTTClient("nyangmeong-device")
     client.configureEndpoint("a3vvk9g700ik4i-ats.iot.ap-northeast-2.amazonaws.com", 8883)
     client.configureCredentials(

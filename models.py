@@ -1,5 +1,6 @@
 from db import db
 
+#실제 RDS 테이블 구조와 일치
 class User(db.Model):
     __tablename__ = 'User'
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
