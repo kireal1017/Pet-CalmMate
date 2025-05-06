@@ -3,6 +3,7 @@ import torch
 from model import DogSoundClassifierV2
 from server.preprocess import preprocess_audio
 from utils.sender import send_result_to_backend
+from barknet_detector import detect_bark as is_dog_bark
 
 app = FastAPI()
 
@@ -15,9 +16,12 @@ class_names = ["Bark", "Growl", "Grunt"]
 
 @app.post("/predict")
 async def predict(file: UploadFile, device_id: str = Form(...)):
-
     with open("temp.wav", "wb") as f:
         f.write(await file.read())
+
+    # BarkNet을 사용하여 애완견 소리 유무 판단
+    if not is_dog_bark("temp.wav"):
+        return {"result": "No dog bark detected"}
 
     mfcc = preprocess_audio("temp.wav", device)
 
