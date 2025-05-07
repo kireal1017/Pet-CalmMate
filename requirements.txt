@@ -9,3 +9,4 @@ noisereduce
 numpy
 requests
 scipy
+python-multipart
