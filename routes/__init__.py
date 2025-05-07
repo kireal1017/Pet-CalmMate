@@ -4,6 +4,7 @@ from .voice import voice_bp
 from .device import device_bp
 from .camera import camera_bp
 from .mic import mic_bp
+from .sound_data import sound_bp
 # from .walk import walk_bp
 # from .group import group_bp
 
@@ -15,6 +16,7 @@ blueprints = [
     device_bp,
     camera_bp,
     mic_bp,
+    sound_data,
     # walk_bp,
     # group_bp,
 ]

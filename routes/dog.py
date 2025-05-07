@@ -75,7 +75,7 @@ def update_dog(dog_id):
         return jsonify({'error': str(e)}), 500
 
 # 📄 강아지 정보 조회 API (전체 또는 특정 유저)
-@dog_bp.route('/dogs', methods=['GET'])
+@dog_bp.route('/dogs', methods=['GET']) #/dogs/<int:user_id>로 바꿔야함 / 현재는 강아지 전체 조회, 유저별 강아지 조회로 수정 필요요
 def get_dogs():
     user_id = request.args.get('user_id')
     try:

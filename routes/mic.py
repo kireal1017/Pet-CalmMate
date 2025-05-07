@@ -14,7 +14,7 @@ def toggle_mic():
 
     # MQTT 메시지 전송
     topic = "cmd/mic"
-    message = "on" if mic_on else "off"
+    message = "on" if mic_on else "off" #수정 필요 문자열이 아닌 dumps로 보내야함 on/off
     send_mqtt_message(topic, message)
 
     return jsonify({'mic_on': mic_on})
