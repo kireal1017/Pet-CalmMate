@@ -2,6 +2,7 @@ import torch
 import torchaudio
 from PIL import Image
 import torchvision.transforms as transforms
+import os
 
 class BarkDetectorCNN(torch.nn.Module):
     def __init__(self):
@@ -27,7 +28,10 @@ class BarkDetectorCNN(torch.nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = BarkDetectorCNN().to(device)
-model.load_state_dict(torch.load("dog_bark_cnn_optimized.pth", map_location=device))
+
+current_dir = os.path.dirname(__file__)
+model_path = os.path.join(current_dir, "dog_bark_cnn_optimized.pth")
+model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval()
 
 def preprocess_audio(file_path, device):

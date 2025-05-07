@@ -3,7 +3,7 @@ import torch
 from model import DogSoundClassifierV2
 from server.preprocess import preprocess_audio
 from utils.sender import send_result_to_backend
-from barknet_detector import detect_bark as is_dog_bark
+from .barknet_detector import detect_bark as is_dog_bark
 
 app = FastAPI()
 
