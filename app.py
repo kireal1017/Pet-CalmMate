@@ -18,6 +18,11 @@ db.init_app(app)  # 등록 필수
 for bp in blueprints:
     app.register_blueprint(bp, url_prefix='/api')
 
+#개발용 연결 확인 메인페이지
+@app.route('/')
+def home():
+    return "Hello, Flask!"
+
 #시작
 if __name__ == '__main__':
     app.run(debug=os.getenv("DEBUG", "True") == "True") #실제 배포 시에 .env에서 DEBUG=False로 바꾼다. False:실배포/운영, True:개발/테스트
