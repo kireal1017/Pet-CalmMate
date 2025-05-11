@@ -1,7 +1,7 @@
 fastapi
 uvicorn
-torch
-torchaudio
+torch>=2.0.0
+torchaudio>=2.0.0
 torchvision
 Pillow
 librosa
@@ -10,3 +10,6 @@ numpy
 requests
 scipy
 python-multipart
+soundfile
+transformers>=4.30.0
+huggingface_hub
