@@ -15,7 +15,7 @@ model.eval()
 
 class_names = ["Bark", "Growl", "Grunt"]
 
-@app.post("/predict")
+@app.post("/ai/predict")
 async def predict(file: UploadFile, device_id: str = Form(...)):
     # 1. 오디오 저장
     with open("temp.wav", "wb") as f:
