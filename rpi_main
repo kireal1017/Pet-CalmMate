@@ -5,6 +5,9 @@ TOPIC_STATUS  = "rpi/status"
 TOPIC_MIC     = "mic/upload" # <- 현재 이거는 아직 안씀
 TOPIC_CONTROL = "cmd/control"
 
+# AI 음성성
+SERVER_URL = "http://54.180.212.150/ai/predict"
+DEVICE_ID  = "raspberrypi001"
 
 from awscrt import io, mqtt, auth, http
 from awsiot import mqtt_connection_builder
@@ -12,7 +15,9 @@ from awsiot import mqtt_connection_builder
 
 from serial.tools import list_ports
 
-import time, json, threading, subprocess, serial, pyaudio, wave, boto3, datetime, glob
+import time, json, threading, subprocess, serial, pyaudio, wave, datetime, requests, os
+
+
 import io as std_io #aws io랑 겹쳐서 별도로 이름 넣음, 레코딩에 쓰이는 io임
 
 
@@ -96,12 +101,14 @@ class Controller:
         "gst-launch-1.0 autovideosrc "
         "! videoconvert "
         "! video/x-raw,format=I420,width=640,height=480 "
-        "! x264enc bframes=0 key-int-max=45 tune=zerolatency "
-        "byte-stream=true speed-preset=ultrafast "
-        "! h264parse "
+        # x264enc 옵션을 한 덩어리로
+        "! x264enc bframes=0 key-int-max=45 tune=zerolatency byte-stream=true speed-preset=ultrafast "
+        # 1초마다 SPS/PPS 전송
+        "! h264parse config-interval=1 "
         "! video/x-h264,stream-format=avc,alignment=au,profile=baseline "
         "! kvssink stream-name=rpi-video"
         )
+    
         
         self.camera_process = subprocess.Popen(
             pipeline, 
@@ -111,7 +118,7 @@ class Controller:
             stderr=subprocess.DEVNULL
             )
         
-        print(f"[INFO] Camera streaming started (PID {self.camera_process.pid})")
+        print(f"카메라 스트리밍 시작 (PID {self.camera_process.pid})")
         
     
     
@@ -133,41 +140,32 @@ class Controller:
 # 녹음 및 S3 업로드 클래스
 # 파라미터(엑세스키, 시크릿키, 버킷이름, 리전이름=기본 아시아, S3 프리픽스)
 
-class Recording:
-    def __init__(self, aws_access_key, aws_secret_key, bucket_name, region_name='ap-northeast-2', s3_prefix='recordings/'):
-        self.s3 = boto3.client(
-            's3',
-            aws_access_key_id = aws_access_key,
-            aws_secret_access_key = aws_secret_key,
-            region_name = region_name
-        )
-        self.bucket_name = bucket_name
-        self.s3_prefix = s3_prefix
 
-        self.format = pyaudio.paInt16
-        self.channels = 1
-        self.rate = 44100
-        self.chunk = 1024
+class Recording:
+    def __init__(self, server_url, device_id, record_seconds=2,
+                 format=pyaudio.paInt16, channels=1, rate=16000, chunk=None):
+        self.server_url = server_url
+        self.device_id = device_id
+        self.format = format
+        self.channels = channels
+        self.rate = rate
+        # chunk: 프레임 크기, 지정 안 하면 1초 단위로 나눠서 처리
+        self.chunk = chunk or self.rate * record_seconds
         self.audio = pyaudio.PyAudio()
+        self.record_seconds = record_seconds
 
         self.stop_event = threading.Event()
         self.thread = None
 
-    def record_audio(self, duration_sec):
+    def record_audio(self):
         stream = self.audio.open(format=self.format,
                                  channels=self.channels,
                                  rate=self.rate,
                                  input=True,
                                  frames_per_buffer=self.chunk)
-
         frames = []
-
-        for _ in range(0, int(self.rate / self.chunk * duration_sec)):
-            if self.stop_event.is_set():
-                break
-            data = stream.read(self.chunk)
-            frames.append(data)
-
+        # CHUNK 단위로 읽어서 WAV 버퍼에 바로 작성
+        frames.append(stream.read(self.chunk))
         stream.stop_stream()
         stream.close()
 
@@ -177,38 +175,47 @@ class Recording:
             wf.setsampwidth(self.audio.get_sample_size(self.format))
             wf.setframerate(self.rate)
             wf.writeframes(b''.join(frames))
-
         wav_buffer.seek(0)
         return wav_buffer
 
-    def upload_to_s3(self, buffer, key):
+    def upload_to_server(self, wav_buffer):
+        # Multipart/form-data 로 device_id 와 파일 전송
+        files = {
+            'file': ('audio.wav', wav_buffer, 'audio/wav')
+        }
+        data = {'device_id': self.device_id}
         try:
-            self.s3.upload_fileobj(buffer, self.bucket_name, key)
-            print(f"✅ 업로드 완료: s3://{self.bucket_name}/{key}")
+            resp = requests.post(self.server_url, files=files, data=data, timeout=10)
+            print("서버 응답 코드:", resp.status_code)
+            print("서버 응답 결과:", resp.text)
         except Exception as e:
-            print(f"❌ 업로드 실패: {e}")
+            print("서버 전송 오류:", e)
 
-    def _worker(self, duration_sec):
+    def _worker(self):
         while not self.stop_event.is_set():
-            now = datetime.datetime.now()
-            s3_key = self.s3_prefix + now.strftime("%Y-%m-%d_%H-%M-%S") + ".wav"
-            buffer = self.record_audio(duration_sec)
-            if not self.stop_event.is_set():
-                self.upload_to_s3(buffer, s3_key)
+            print("녹음 시작")
+            wav_buf = self.record_audio()
+            print("녹음 완료 -> 서버 업로드")
+            self.upload_to_server(wav_buf)
+            print(f"{self.record_seconds}초 대기\n")
+            time.sleep(self.record_seconds)
 
-    def start(self, record_seconds=3):
-        if self.thread is None or not self.thread.is_alive():
-            print("🔁 녹음 스레드 시작됨.")
-            self.thread = threading.Thread(target=self._worker, args=(record_seconds,))
-            self.thread.start()
+    def start(self):
+        if self.thread and self.thread.is_alive():
+            print("녹음 실행 중")
+            return
+        print("녹음 스레드 시작")
+        self.stop_event.clear()
+        self.thread = threading.Thread(target=self._worker, daemon=True)
+        self.thread.start()
 
     def stop(self):
-        print("🛑 녹음 스레드 중지 요청됨.")
+        print("녹음 중지")
         self.stop_event.set()
-        self.thread.join()
+        if self.thread:
+            self.thread.join()
         self.audio.terminate()
-        print("✅ 녹음 종료 완료.")
-
+        print("녹음 종료")
 
 #------------------------------------------------------------- 여기부터 메인
 
@@ -235,12 +242,13 @@ def main():
     print("connected")
     
     recorder = Recording(
-        aws_access_key=S3_AWS_ACCESS_KEY_ID,
-        aws_secret_key=S3_AWS_SECRET_ACCESS_KEY,
-        bucket_name=S3_BUCKET_NAME
+        server_url=SERVER_URL,
+        device_id=DEVICE_ID,
+        record_seconds=2
     )
+
     
-    recorder.start(record_seconds=2)  # 2초 간격으로 녹음 -> 업로드 파이프라인 가동
+    recorder.start()  # 2초 간격으로 녹음 -> 업로드 파이프라인 가동
     
     
     cont = Controller(mqtt_connection)
@@ -284,6 +292,7 @@ def main():
         recorder.stop()
         cont.stop_camera_stream()
         mqtt_connection.disconnect().result()
+        
 
 
 if __name__ == "__main__":
