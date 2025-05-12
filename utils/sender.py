@@ -1,6 +1,6 @@
 import requests
 
-FLASK_BACKEND_URL = "http://127.0.0.1:5000/api/dog-sound"
+FLASK_BACKEND_URL = "http://127.0.0.1:8000/api/dog-sound"
 
 def send_result_to_backend(device_id, sound_type, confidence):
     import datetime
