@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from db import db 
-import os
+import os, logging
 from dotenv import load_dotenv
 from config import SQLALCHEMY_DATABASE_URI
 from routes import blueprints
