@@ -23,6 +23,22 @@ for bp in blueprints:
 def home():
     return "Hello, Flask!"
 
+# 🔄 로깅 설정
+logging.basicConfig(
+    filename='flask_app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# 🔄 모든 요청을 로깅
+@app.before_request
+def log_request_info():
+    app.logger.info(f"Request Method: {request.method} | Path: {request.path} | IP: {request.remote_addr}")
+    app.logger.info(f"Headers: {request.headers}")
+    if request.method in ['POST', 'PUT', 'PATCH']:
+        app.logger.info(f"Payload: {request.get_json()}")
+
 #시작
 if __name__ == '__main__':
     app.run(debug=os.getenv("DEBUG", "True") == "True") #실제 배포 시에 .env에서 DEBUG=False로 바꾼다. False:실배포/운영, True:개발/테스트
