@@ -19,4 +19,4 @@ SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:33
 
 # IVS
 IVS_CHANNEL_NAME = os.getenv("IVS_CHANNEL_NAME")
-region = os.getenv("IVS_REGION")
+IVS_REGION = os.getenv("IVS_REGION")

@@ -14,29 +14,34 @@ logger = logging.getLogger(__name__)
 # 🔄 IVS 클라이언트 생성
 ivs_client = boto3.client('ivs', region_name=IVS_REGION)
 
-@camera_bp.route('/stream-url', methods=['GET'])
+# 🔄 HLS 스트림 URL 제공 API
+@camera_bp.route('/camera/stream-url', methods=['GET'])
 def get_ivs_stream_url():
+    """
+    IVS 스트림 URL을 제공하는 API 엔드포인트
+    """
     try:
-        # 🔄 1. IVS 채널 목록 가져오기
+        # 1️⃣ IVS 채널 ARN 요청
         logger.info(f"Fetching IVS Channel List for Channel: {IVS_CHANNEL_NAME}")
         
         response = ivs_client.list_channels(
             filterByName=IVS_CHANNEL_NAME
         )
 
-        # 🔄 2. 채널이 없을 때 처리
+        # 🔎 채널이 없으면 404 에러 반환
         if not response['channels']:
             logger.error(f"Channel not found: {IVS_CHANNEL_NAME}")
             return jsonify({'error': 'Channel not found'}), 404
 
-        # 🔄 3. 채널 ARN 및 Playback URL 추출
+        # 2️⃣ ARN 및 Playback URL 추출
         channel_arn = response['channels'][0]['arn']
-        playback_url = response['channels'][0]['playbackUrl']
-
         logger.info(f"Channel ARN: {channel_arn}")
-        logger.info(f"Playback URL: {playback_url}")
 
-        # 🔄 4. 결과 반환
+        # 3️⃣ HLS 스트림 URL 요청
+        playback_url = f"https://{channel_arn}.ivs.{IVS_REGION}.amazonaws.com/hls/v1/live.m3u8"
+        logger.info(f"HLS Streaming URL: {playback_url}")
+
+        # 4️⃣ 결과 반환
         return jsonify({
             'stream_url': playback_url
         }), 200
