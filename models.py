@@ -55,3 +55,7 @@ class SoundAnalysis(db.Model):
     record_date = db.Column(db.DateTime, nullable=False)
     anxiety_level = db.Column(db.Integer)
     sound_features = db.Column(db.String(255))
+    def __init__(self, dog_id, anxiety_level, sound_features):
+        self.dog_id = dog_id
+        self.anxiety_level = anxiety_level
+        self.sound_features = sound_features
