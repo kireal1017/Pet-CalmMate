@@ -33,15 +33,25 @@ def get_ivs_stream_url():
             logger.error(f"Channel not found: {IVS_CHANNEL_NAME}")
             return jsonify({'error': 'Channel not found'}), 404
 
-        # 2️⃣ ARN 및 Playback URL 추출
+        # 2️⃣ ARN 추출
         channel_arn = response['channels'][0]['arn']
         logger.info(f"Channel ARN: {channel_arn}")
 
-        # 3️⃣ HLS 스트림 URL 요청
-        playback_url = f"https://{channel_arn}.ivs.{IVS_REGION}.amazonaws.com/hls/v1/live.m3u8"
+        # 3️⃣ 스트림 상태 확인 및 Playback URL 추출
+        stream_info = ivs_client.get_stream(
+            channelArn=channel_arn
+        )
+
+        # 🔎 스트림이 활성 상태인지 확인
+        if stream_info['stream']['state'] != 'LIVE':
+            logger.error(f"Stream is not currently live for channel: {IVS_CHANNEL_NAME}")
+            return jsonify({'error': 'Stream is not live'}), 404
+        
+        # 4️⃣ HLS 스트림 URL 추출
+        playback_url = stream_info['stream']['playbackUrl']
         logger.info(f"HLS Streaming URL: {playback_url}")
 
-        # 4️⃣ 결과 반환
+        # 5️⃣ 결과 반환
         return jsonify({
             'stream_url': playback_url
         }), 200
@@ -49,7 +59,6 @@ def get_ivs_stream_url():
     except Exception as e:
         logger.exception("Error fetching IVS stream URL")
         return jsonify({'error': str(e)}), 500
-
 
 # 📡 카메라 ON API (MQTT 전송)
 @camera_bp.route('/camera/on', methods=['POST'])
