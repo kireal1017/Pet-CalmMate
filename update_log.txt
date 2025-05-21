@@ -1,7 +1,0 @@
-🔄 Git에서 최신 코드 가져오는 중...
-From https://github.com/kireal1017/Pet-CalmMate
- * branch              backend    -> FETCH_HEAD
-Already up to date.
-✅ Git Pull 완료!
-🔄 Gunicorn 재시작 중...
-✅ Gunicorn이 정상적으로 실행되었습니다.
