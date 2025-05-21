@@ -13,3 +13,8 @@ config.py
 certs/*.pem
 certs/*.key
 certs/*.crt
+
+code_update.sh
+restart.sh
+update_log.txt
+nohup.out
