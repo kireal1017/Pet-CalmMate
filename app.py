@@ -37,7 +37,11 @@ def log_request_info():
     app.logger.info(f"Request Method: {request.method} | Path: {request.path} | IP: {request.remote_addr}")
     app.logger.info(f"Headers: {request.headers}")
     if request.method in ['POST', 'PUT', 'PATCH']:
-        app.logger.info(f"Payload: {request.get_json()}")
+        if request.content_type and 'application/json' in request.content_type:
+            app.logger.info(f"Payload: {request.get_json()}")
+        else:
+            app.logger.info("Payload: [multipart/form-data or other]")
+
 
 #시작
 if __name__ == '__main__':
