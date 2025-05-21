@@ -18,29 +18,33 @@ def delayed_delete(filepath, delay=10):
 
 @voice_bp.route('/speak-upload', methods=['POST'])
 def upload_and_play_voice():
+    print("[🔔] API 호출됨")
+
     if 'file' not in request.files:
+        print("[❌] file 없음")
         return jsonify({'error': 'No file provided'}), 400
 
     file = request.files['file']
+    print(f"[📁] 파일 이름: {file.filename}")
+
     if not file.filename.endswith('.wav'):
+        print("[❌] 확장자 오류")
         return jsonify({'error': 'Only .wav files allowed'}), 400
 
-    # 고유 파일명 생성 후 저장
     filename = f"{uuid.uuid4().hex}.wav"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
+    print(f"[✅] 파일 저장 완료: {filepath}")
 
-    # URL 생성
-    public_url = f"http://<EC2_PUBLIC_IP>/static/voice/{filename}"
-
-    # MQTT 메시지 전송
+    public_url = f"http://54.180.212.150/static/voice/{filename}"
     message = {
-        "command": "play_audio",
+        "message": "speaker",
         "url": public_url
     }
+    print(f"[📤] MQTT 전송: {json.dumps(message)}")
     send_mqtt_message("cmd/control", json.dumps(message))
 
-    # 삭제 스케줄 (10초 후)
     threading.Thread(target=delayed_delete, args=(filepath, 10)).start()
+    print("[🚀] 삭제 스레드 실행됨")
 
     return jsonify({'result': 'ok', 'message': '음성 재생 요청 완료'})
