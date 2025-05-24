@@ -1,26 +1,81 @@
-from transformers import pipeline
+import torch
+import torchaudio
+import torchaudio.transforms as T
+from transformers import AutoProcessor, AutoModel
+import torch.nn as nn
 
-# 1. 모델 초기화 (최초 한 번만 로드됨)
-classifier = pipeline(
-    "audio-classification",
-    model="ardneebwar/wav2vec2-animal-sounds-finetuned-hubert-finetuned-animals"
-)
+# 전역 설정
+THRESHOLD = 0.7
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 2. 강아지 소리 감지 함수 정의
-def detect_bark(file_path, threshold=0.85):
-   
+# Whisper 분류기 정의
+class WhisperClassifier(nn.Module):
+    def __init__(self, base_model, hidden_dim=768, num_labels=2):
+        super().__init__()
+        self.encoder = base_model.encoder
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_labels)
+        )
+
+    def forward(self, input_features):
+        with torch.no_grad():
+            features = self.encoder(input_features).last_hidden_state
+        pooled = features.mean(dim=1)
+        return self.classifier(pooled)
+
+# Whisper 모델 및 Processor 로드
+processor = AutoProcessor.from_pretrained("openai/whisper-small")
+base_model = AutoModel.from_pretrained("openai/whisper-small")
+model = WhisperClassifier(base_model).to(device)
+
+# 저장된 학습 파라미터 로드
+model.load_state_dict(torch.load("whisper_dog_model.pth", map_location=device))
+model.eval()
+
+# 전처리 함수
+def preprocess_audio(path, silence_threshold=0.01):
+    waveform, sr = torchaudio.load(path)
+    waveform = waveform.mean(dim=0).unsqueeze(0)  # mono
+
+    # 무음 필터
+    if waveform.abs().mean().item() < silence_threshold:
+        return None
+
+    # 리샘플링
+    if sr != 16000:
+        waveform = T.Resample(orig_freq=sr, new_freq=16000)(waveform)
+
+    # 정규화
+    waveform = waveform / waveform.abs().max()
+
+    # Whisper 입력
+    inputs = processor(waveform.squeeze(), sampling_rate=16000, return_tensors="pt")
+    return inputs["input_features"].squeeze(0).unsqueeze(0).to(device)
+
+# 감지 함수: 입력 → 결과(True/False), confidence 반환
+def detect_bark(file_path, threshold=0.7):
     try:
-        # top_k=1 설정: 가장 가능성 높은 클래스만 추출
-        results = classifier(file_path, top_k=1)
-        label = results[0]["label"].lower()
-        score = results[0]["score"]
+        input_features = preprocess_audio(file_path)
+        if input_features is None:
+            return False, 0.0
 
-        print(f"감지 라벨: {label}, 신뢰도: {score:.2f}")
+        with torch.no_grad():
+            logits = model(input_features)
+            probs = torch.softmax(logits, dim=1)[0]
+            dog_prob = probs[1].item()
 
-        if label == "dog" and score >= threshold:
-            return True, score
-        else:
-            return False, score
-    except Exception as e:
-        print("예외 발생 (detect_bark):", e)
+        return (dog_prob >= threshold), dog_prob
+
+    except Exception:
         return False, 0.0
+
+# CLI 테스트용
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("사용법: python barknet_detector.py <오디오파일경로>")
+    else:
+        result, conf = detect_bark(sys.argv[1])
+        print("🗣️ 개가 짖었습니다!" if result else "🔇 짖지 않았습니다.", f"(신뢰도: {conf:.2f})")
