@@ -5,7 +5,7 @@ TOPIC_STATUS  = "rpi/status"
 TOPIC_MIC     = "mic/upload" # <- 현재 이거는 아직 안씀
 TOPIC_CONTROL = "cmd/control"
 
-# AI 음성성
+# AI 음성
 SERVER_URL = "http://54.180.212.150/ai/predict"
 DEVICE_ID  = "raspberrypi001"
 
@@ -78,7 +78,8 @@ class Controller:
             
         elif command == "speaker":
             self.play_speaker()
-
+            url = payload.get("url")
+            print(f"sound: {url}")
             return {"status":"user_sound", **time_stamp}
             
         else:
@@ -112,7 +113,7 @@ class Controller:
         
         self.camera_process = subprocess.Popen(
             pipeline, 
-            shell=True, 
+            shell=True,
             executable="/bin/bash",
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
@@ -185,7 +186,7 @@ class Recording:
         }
         data = {'device_id': self.device_id}
         try:
-            resp = requests.post(self.server_url, files=files, data=data, timeout=10)
+            resp = requests.post(self.server_url, files=files, data=data, timeout=20) # 서버 타임 아웃 시간 설정
             print("서버 응답 코드:", resp.status_code)
             print("서버 응답 결과:", resp.text)
         except Exception as e:
