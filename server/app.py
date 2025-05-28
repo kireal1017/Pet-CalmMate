@@ -1,11 +1,11 @@
 from fastapi import FastAPI, UploadFile, Form
 import torch
 import os
-from model import DogSoundClassifierV2
-from server.preprocess import preprocess_audio
+#from server.preprocess import preprocess_audio
 from utils.sender import send_result_to_backend
 from server.barknet_detector import detect_bark as is_dog_bark
 from datetime import datetime
+from model import analyze_emotion
 
 app = FastAPI()
 
