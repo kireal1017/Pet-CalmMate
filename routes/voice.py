@@ -27,11 +27,11 @@ def upload_and_play_voice():
     file = request.files['file']
     print(f"[📁] 파일 이름: {file.filename}")
 
-    if not file.filename.endswith('.wav'):
+    if not file.filename.endswith('.m4a'):
         print("[❌] 확장자 오류")
-        return jsonify({'error': 'Only .wav files allowed'}), 400
+        return jsonify({'error': 'Only .m4a files allowed'}), 400
 
-    filename = f"{uuid.uuid4().hex}.wav"
+    filename = f"{uuid.uuid4().hex}.m4a"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
     print(f"[✅] 파일 저장 완료: {filepath}")
