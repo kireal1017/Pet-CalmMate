@@ -2,7 +2,7 @@ import requests
 
 FLASK_BACKEND_URL = "http://54.180.212.150/api/dog-sound"
 
-def send_result_to_backend(device_id, sound_type, confidence):
+def send_result_to_backend(device_id, sound_type, confidence, timestamp):
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

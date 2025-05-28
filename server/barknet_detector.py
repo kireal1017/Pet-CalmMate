@@ -1,3 +1,4 @@
+import os
 import torch
 import torchaudio
 import torchaudio.transforms as T
@@ -5,8 +6,11 @@ from transformers import AutoProcessor, AutoModel
 import torch.nn as nn
 
 # 전역 설정
-THRESHOLD = 0.7
+THRESHOLD = 0.1
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "whisper_dog_model.pth")
+
 
 # Whisper 분류기 정의
 class WhisperClassifier(nn.Module):
@@ -31,7 +35,7 @@ base_model = AutoModel.from_pretrained("openai/whisper-small")
 model = WhisperClassifier(base_model).to(device)
 
 # 저장된 학습 파라미터 로드
-model.load_state_dict(torch.load("whisper_dog_model.pth", map_location=device))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.eval()
 
 # 전처리 함수
@@ -55,7 +59,7 @@ def preprocess_audio(path, silence_threshold=0.01):
     return inputs["input_features"].squeeze(0).unsqueeze(0).to(device)
 
 # 감지 함수: 입력 → 결과(True/False), confidence 반환
-def detect_bark(file_path, threshold=0.7):
+def detect_bark(file_path, threshold=0.1):
     try:
         input_features = preprocess_audio(file_path)
         if input_features is None:
