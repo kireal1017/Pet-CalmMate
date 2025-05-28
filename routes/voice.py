@@ -47,4 +47,4 @@ def upload_and_play_voice():
     threading.Thread(target=delayed_delete, args=(filepath, 10)).start()
     print("[🚀] 삭제 스레드 실행됨")
 
-    return jsonify({'result': 'ok', 'message': '음성 재생 요청 완료'})
+    return jsonify({'result': 'ok', 'message': 'voice speak complete'})
