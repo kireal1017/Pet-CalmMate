@@ -1,30 +1,50 @@
-import torch.nn as nn
+import librosa
+import numpy as np
 
-class DogSoundClassifierV2(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(1, 32, 3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((5, 5))
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(128 * 5 * 5, 128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 3)
-        )
+def extract_features_fixed(wav_path, sr=16000, n_fft=512, hop_length=128):
+    y, sr = librosa.load(wav_path, sr=sr)
+    S = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_length))
+    freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
 
-    def forward(self, x):
-        x = self.conv(x)
-        x = x.view(x.size(0), -1)
-        return self.fc(x)
+    total_energy = S.sum()
+    low = S[freqs < 2000].sum() / total_energy
+    mid = S[(freqs >= 2000) & (freqs < 4000)].sum() / total_energy
+    high = S[freqs >= 4000].sum() / total_energy
+
+    energy_over_time = S.sum(axis=0)
+    mean_energy = np.mean(energy_over_time)
+    std_energy = np.std(energy_over_time)
+    energy_var_ratio = std_energy / (mean_energy + 1e-6)
+    avg_delta = np.mean(np.abs(np.diff(energy_over_time)))
+
+    return {
+        'low': low, 'mid': mid, 'high': high,
+        'energy_var_ratio': energy_var_ratio,
+        'avg_delta': avg_delta
+    }
+
+def classify_emotion(features):
+    low = features['low']
+    mid = features['mid']
+    high = features['high']
+    var_ratio = features['energy_var_ratio']
+    avg_delta = features['avg_delta']
+
+    if high > 0.25 and var_ratio > 0.5:
+        return 'Sad'
+    elif low > 0.7 and avg_delta < 0.2:
+        return 'Lonely'
+    elif low > 0.6 and high < 0.1 and avg_delta > 0.4:
+        return 'Angry'
+    elif low > 0.5 and high > 0.15:
+        return 'Anxious'
+    elif mid > 0.4 and avg_delta > 0.2:
+        return 'Happy'
+    else:
+        return 'Unknown'
+
+# 🔍 최종 분석 진입점
+def analyze_emotion(wav_path):
+    features = extract_features_fixed(wav_path)
+    emotion = classify_emotion(features)
+    return emotion
