@@ -25,11 +25,11 @@ def add_dog():
         return jsonify({'error': 'Invalid birth_date format (YYYY-MM-DD expected)'}), 400
 
     try:
-        photo_file = request.files['photo']
+        photo_file = request.files['photo'] # json파일로 사진을 못받음 -> files, form으로 받기
         photo_url = upload_file_to_s3(photo_file, photo_file.filename, folder="dogs")
 
         new_dog = Dog(
-            user_id=request.form['user_id'],
+            user_id=request.form['user_id'], #왜 json파일로 안받나? -> 위에 photo 사진을 받아야해서
             name=request.form['name'],
             breed=request.form['breed'],
             birth_date=birth_date,
