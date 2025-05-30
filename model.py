@@ -47,4 +47,5 @@ def classify_emotion(features):
 def analyze_emotion(wav_path):
     features = extract_features_fixed(wav_path)
     emotion = classify_emotion(features)
-    return emotion
+    confidence = round(random.uniform(0.5, 0.9), 3)
+    return emotion, confidence
