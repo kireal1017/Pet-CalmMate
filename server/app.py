@@ -42,21 +42,15 @@ async def predict(file: UploadFile, device_id: str = Form(...)):
 
     print("🔄 [DEBUG] Step 3: Bark detected")
 
-    # 3. 전처리
-    mfcc = preprocess_audio("temp.wav", device)
-    print("🔄 [DEBUG] Step 4: Preprocessing completed")
 
     # 4. 분류
+    # 3. 감정 분석 (딥러닝 제거, model.py의 함수 호출)
     try:
-        with torch.no_grad():
-            outputs = model(mfcc)
-            pred = torch.argmax(outputs, dim=1).item()
-            confidence = torch.softmax(outputs, dim=1).max().item()
-        result = class_names[pred]
-        print(f"🔄 [DEBUG] Step 5: Prediction done - {result} with confidence {confidence}")
+        result, confidence = analyze_emotion("temp.wav")
+        print(f"🔄 [DEBUG] Step 4: Emotion analysis done - {result} (conf: {confidence})")
     except Exception as e:
-        print(f"🔴 [ERROR] Model inference failed: {e}")
-        return {"result": "Model inference failed"}
+        print(f"🔴 [ERROR] Emotion analysis failed: {e}")
+        return {"result": "Emotion analysis failed"}
 
     # 5. 결과 전송
     print(f"🔄 [DEBUG] Step 6: Sending to Flask - {result}")
