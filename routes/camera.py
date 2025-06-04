@@ -11,22 +11,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @camera_bp.route('/camera/stream-url', methods=['GET'])
-def get_kvs_stream_url():
+def get_hls_stream_url():
+    """
+    HLS 스트림 URL을 반환하는 API (환경변수 기반)
+    """
     try:
-        # 여기서 media_client 생성하고, get_hls_streaming_session_url 호출
-        media_client = boto3.client("kinesisvideo")
-        endpoint = media_client.get_data_endpoint(
-            StreamName="YourStreamName",
-            APIName="GET_HLS_STREAMING_SESSION_URL"
-        )['DataEndpoint']
-
-        media_client = boto3.client("kinesis-video-archived-media", endpoint_url=endpoint)
-        hls_url = media_client.get_hls_streaming_session_url(
-            StreamName="YourStreamName",
-            PlaybackMode='LIVE'
-        )['HLSStreamingSessionURL']
-
-        return jsonify({'stream_url': hls_url})
+        hls_url = f"{HLS_BASE_URL}/{RTMP_STREAM_ID}.m3u8"
+        return jsonify({'stream_url': hls_url}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
