@@ -54,14 +54,24 @@ def dispense_snack():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@device_bp.route('/music-play', methods=['POST']) #노래 재생 API (테스트필요)
+@device_bp.route('/music-play', methods=['POST'])
 def music_play():
     data = request.get_json()
     dog_id = data.get('dog_id')
+    music_type = str(data.get('type'))  # 반드시 문자열로 전송 (1~5, 0)
+
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
 
-    message = json.dumps({"message": "music"})
+    if music_type not in ['0', '1', '2', '3', '4', '5']:
+        return jsonify({'error': 'type must be 0~5'}), 400
+
+    message = json.dumps({
+        "message": "music",
+        "type": music_type
+    })
+
     send_mqtt_message("cmd/control", message)
 
-    return jsonify({'message': f'music command sent to dog {dog_id}.'}), 200
+    action = "stopped" if music_type == '0' else f"music #{music_type} played"
+    return jsonify({'message': f'{action} for dog {dog_id}'}), 200
