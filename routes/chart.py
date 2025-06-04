@@ -241,12 +241,12 @@ def get_monthly_anxiety_chart():
 
         records = SoundAnalysis.query.filter(
             SoundAnalysis.dog_id == dog_id,
-            extract('year', SoundAnalysis.record_date) == year,
-            extract('month', SoundAnalysis.record_date) == month
+            extract('year', SoundAnalysis.record_datetime) == year,
+            extract('month', SoundAnalysis.record_datetime) == month
         ).all()
 
         for record in records:
-            day = record.record_date.day
+            day = record.record_datetime.day  # ✅ 수정됨
             if record.anxiety_level is not None:
                 anxiety_by_day[day - 1].append(record.anxiety_level)
 
@@ -264,8 +264,9 @@ def get_monthly_anxiety_chart():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
-#일간 불안도 차트
+
+
+# 일간 불안도 차트
 @chart_bp.route('/chart/anxiety/daily', methods=['GET'])
 def get_daily_anxiety_chart():
     dog_id = request.args.get('dog_id', type=int)
@@ -283,12 +284,12 @@ def get_daily_anxiety_chart():
 
         records = SoundAnalysis.query.filter(
             SoundAnalysis.dog_id == dog_id,
-            SoundAnalysis.record_date >= start,
-            SoundAnalysis.record_date < end
+            SoundAnalysis.record_datetime >= start,
+            SoundAnalysis.record_datetime < end
         ).all()
 
         for record in records:
-            hour = record.record_date.hour
+            hour = record.record_datetime.hour  # ✅ 수정됨
             if record.anxiety_level is not None:
                 hourly_anxiety[hour].append(record.anxiety_level)
 
@@ -300,7 +301,7 @@ def get_daily_anxiety_chart():
         return jsonify({
             'dog_id': dog_id,
             'date': date_str,
-            'hourly_avg_anxieties': hourly_avg_anxieties  # index = 시간(0~23)
+            'hourly_avg_anxieties': hourly_avg_anxieties
         })
 
     except Exception as e:
