@@ -1,8 +1,9 @@
 import boto3
 import subprocess
+from config import RTMP_STREAM_ID, AWS_S3_REGION
 
-STREAM_NAME = "rpi-video"  # ← 여기를 바꿔야 해!
-REGION = "ap-northeast-2"  # 서울 리전
+STREAM_NAME = RTMP_STREAM_ID
+REGION = AWS_S3_REGION  # 서울
 
 print("🔍 Getting KVS endpoint...")
 kvs_client = boto3.client("kinesisvideo", region_name=REGION)
