@@ -1,4 +1,4 @@
-import sys, os
+"""import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from flask import Blueprint, jsonify, request
@@ -81,3 +81,4 @@ def protected_profile():
     except Exception as e:
         logging.error(f"[Protected API Error] {e}")
         return jsonify({'error': 'Internal server error'}), 500
+"""
