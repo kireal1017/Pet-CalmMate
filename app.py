@@ -4,7 +4,9 @@ from db import db
 import os, logging
 from dotenv import load_dotenv
 from config import SQLALCHEMY_DATABASE_URI
+from config import JWT_SECRET_KEY,JWT_ACCESS_TOKEN_EXPIRES_DELTA
 from routes import blueprints
+from flask_jwt_extended import JWTManager
 
 app = Flask(__name__)
 CORS(app)
@@ -13,6 +15,14 @@ CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)  # 등록 필수
+
+# JWT 설정
+# .env 에 JWT_SECRET_KEY 와 JWT_ACCESS_TOKEN_EXPIRES (초 단위) 를 추가해 둡니다.
+app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = JWT_ACCESS_TOKEN_EXPIRES_DELTA
+
+# JWTManager 초기화
+jwt = JWTManager(app)
 
 # 블루프린트 등록
 for bp in blueprints:

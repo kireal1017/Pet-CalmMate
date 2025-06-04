@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -20,3 +21,16 @@ SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:33
 # IVS
 IVS_CHANNEL_NAME = os.getenv("IVS_CHANNEL_NAME")
 IVS_REGION = os.getenv("IVS_REGION")
+
+# JWT 설정정
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    raise RuntimeError("환경 변수 JWT_SECRET_KEY가 설정되지 않았습니다. 반드시 .env에 추가하세요.")
+
+# 액세스 토큰 만료 시간(초 단위)
+try:
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
+except ValueError:
+    JWT_ACCESS_TOKEN_EXPIRES = 3600
+
+JWT_ACCESS_TOKEN_EXPIRES_DELTA = timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)
