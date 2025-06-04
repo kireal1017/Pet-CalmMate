@@ -11,22 +11,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @camera_bp.route('/camera/stream-url', methods=['GET'])
-def get_kvs_hls_stream_url():
-    """
-    EC2에서 중계되는 HLS 스트림 URL을 제공하는 API 엔드포인트
-    """
+def get_kvs_stream_url():
     try:
-        # 기본 HLS URL 구성
-        stream_id = RTMP_STREAM_ID  # ex: "kvs-stream"
-        hls_url = f"http://{EC2_PUBLIC_IP}/hls/{stream_id}.m3u8"
+        # 여기서 media_client 생성하고, get_hls_streaming_session_url 호출
+        media_client = boto3.client("kinesisvideo")
+        endpoint = media_client.get_data_endpoint(
+            StreamName="YourStreamName",
+            APIName="GET_HLS_STREAMING_SESSION_URL"
+        )['DataEndpoint']
 
-        # 기본 응답 반환
-        return jsonify({
-            'stream_url': hls_url
-        }), 200
+        media_client = boto3.client("kinesis-video-archived-media", endpoint_url=endpoint)
+        hls_url = media_client.get_hls_streaming_session_url(
+            StreamName="YourStreamName",
+            PlaybackMode='LIVE'
+        )['HLSStreamingSessionURL']
 
+        return jsonify({'stream_url': hls_url})
     except Exception as e:
-        logger.exception("Error building HLS stream URL")
         return jsonify({'error': str(e)}), 500
 
 # 📡 카메라 ON API (MQTT 전송)
