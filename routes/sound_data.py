@@ -19,7 +19,7 @@ def get_dog_id_from_device(device_id):
     return device.dog_id if device else None
 
 #불안도레벨 자동부여여
-def calculate_anxiety_level(sound_type, confidence):
+def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     # 기본 점수 테이블
     base_score_map = {
         "Sad": 3,
@@ -96,8 +96,14 @@ def receive_sound_data():
             return jsonify({"error": "등록되지 않은 device_id입니다"}), 400
 
         # 예: 불안도 계산
-        anxiety_level = calculate_anxiety_level(sound_type, confidence)
+        timestamp_str = data.get("timestamp")
+        timestamp_obj = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
 
+        anxiety_level = calculate_anxiety_level(
+            sound_type=sound_type,
+            confidence=confidence,
+            dog_id=dog_id,
+            timestamp=timestamp_obj )
         # DB 저장
         save_to_db(
             dog_id=dog_id,
