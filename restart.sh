@@ -9,7 +9,7 @@ pkill gunicorn
 source ~/Pet-CalmMate/venv/bin/activate
 
 # 🔄 Gunicorn 백그라운드 실행
-~/Pet-CalmMate/venv/bin/gunicorn app:app --bind 0.0.0.0:8000 --workers 1 --daemon
+~/Pet-CalmMate/venv/bin/gunicorn app:app --bind 0.0.0.0:8000 --workers 1
 
 # 🔄 실행 확인
 if pgrep -x "gunicorn" > /dev/null

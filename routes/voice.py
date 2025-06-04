@@ -5,8 +5,7 @@ from config import EC2_PUBLIC_IP
 
 voice_bp = Blueprint('voice', __name__)
 
-UPLOAD_FOLDER = './static/voice'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs("./static/voice", exist_ok=True)
 
 def delayed_delete(filepath, delay=10):
     """지정한 시간 후 파일 삭제"""
@@ -33,7 +32,7 @@ def upload_and_play_voice():
         return jsonify({'error': 'Only .m4a files allowed'}), 400
 
     filename = f"{uuid.uuid4().hex}.m4a"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    filepath = f"/home/ubuntu/Pet-CalmMate/static/voice/{filename}"
     file.save(filepath)
     print(f"[✅] 파일 저장 완료: {filepath}")
 
@@ -45,7 +44,7 @@ def upload_and_play_voice():
     print(f"[📤] MQTT 전송: {json.dumps(message)}")
     send_mqtt_message("cmd/control", json.dumps(message))
 
-    threading.Thread(target=delayed_delete, args=(filepath, 10)).start()
+    threading.Thread(target=delayed_delete, args=(filepath, 30)).start()
     print("[🚀] 삭제 스레드 실행됨")
 
     return jsonify({'result': 'ok', 'message': 'voice speak complete'})
