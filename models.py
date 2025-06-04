@@ -88,7 +88,7 @@ class SoundAnalysis(db.Model):
     __tablename__ = 'SoundAnalysis'
     analysis_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     dog_id = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=False)
-    record_date = db.Column(db.DateTime, nullable=False)
+    record_datetime = db.Column(db.DateTime, nullable=False)
     anxiety_level = db.Column(db.Integer)
     sound_features = db.Column(db.String(255))
     '''

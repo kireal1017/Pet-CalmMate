@@ -69,11 +69,11 @@ def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     return anxiety_level
 
 # 🔹 DB에 데이터 저장하는 함수
-def save_to_db(dog_id, anxiety_level, sound_features, record_date):
+def save_to_db(dog_id, anxiety_level, sound_features, record_datetime):
     new_entry = SoundAnalysis(
         dog_id=dog_id,
         anxiety_level=anxiety_level,
-        record_date=record_date,
+        record_date=record_datetime,
         sound_features=sound_features
     )
     db.session.add(new_entry)
@@ -110,7 +110,7 @@ def receive_sound_data():
             dog_id=dog_id,
             anxiety_level=anxiety_level,
             sound_features=sound_type,
-            record_date=timestamp_obj
+            record_datetime=timestamp_obj
         )
 
         latest_sound_data = {
