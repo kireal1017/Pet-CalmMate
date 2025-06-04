@@ -20,7 +20,7 @@ SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:33
 
 EC2_PUBLIC_IP = os.getenv("EC2_IP")
 RTMP_STREAM_ID = os.getenv("RTMP_STREAM_ID")
-HLS_BASE_URL = f"http://{EC2_PUBLIC_IP}/hls"
+HLS_BASE_URL = f"http://{EC2_PUBLIC_IP}:8080/hls"
 
 # JWT 설정정
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
