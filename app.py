@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from db import db 
 import os, logging
-from dotenv import load_dotenv
+from dotenv import load_dotenv # <- config.py 에서 .env 파일을 읽어오기때문에 불필요해 보임
 from config import SQLALCHEMY_DATABASE_URI
 from config import JWT_SECRET_KEY,JWT_ACCESS_TOKEN_EXPIRES_DELTA
 from routes import blueprints
@@ -21,7 +21,6 @@ db.init_app(app)  # 등록 필수
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = JWT_ACCESS_TOKEN_EXPIRES_DELTA
 
-# JWTManager 초기화
 jwt = JWTManager(app)
 
 # 블루프린트 등록
