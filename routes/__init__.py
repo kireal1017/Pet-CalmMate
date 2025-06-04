@@ -7,13 +7,15 @@ from .mic import mic_bp
 from .sound_data import sound_data_bp
 from .chart import chart_bp
 #from .solution import solution_bp
-#from .weight import weight_bp
-# from .walk import walk_bp
+from .weight import weight_bp
+from .walk import walk_bp
+from .meal import meal_bp
 # from .group import group_bp
 
 # 블루프린트 리스트로 정리, app.py 가독성 증가를 위해 __init__에서 묶는다.
 blueprints = [
-    #weight_bp,
+    meal_bp,
+    weight_bp,
     #solution_bp,
     chart_bp,
     user_bp,
@@ -23,6 +25,6 @@ blueprints = [
     camera_bp,
     mic_bp,
     sound_data_bp,
-    # walk_bp,
+    walk_bp,
     # group_bp,
 ]

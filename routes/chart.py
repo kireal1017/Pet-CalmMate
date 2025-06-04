@@ -1,12 +1,13 @@
 from flask import Blueprint, request, jsonify
 from db import db
-from models import CareRecord
+from models import WeightRecord, WalkRecord, Meal
 from sqlalchemy import extract
 import calendar
+from datetime import datetime, timedelta
 
 chart_bp = Blueprint('chart', __name__)
 
-#월 차트 (일별 체중 30개개)
+# 월간 체중 그래프: 일별 체중 (30~31일)
 @chart_bp.route('/chart/weight', methods=['GET'])
 def get_weight_chart():
     dog_id = request.args.get('dog_id', type=int)
@@ -17,15 +18,13 @@ def get_weight_chart():
         return jsonify({'error': 'dog_id, year, month are required'}), 400
 
     try:
-        # 해당 월의 일 수만큼 빈 리스트 생성
         days_in_month = calendar.monthrange(year, month)[1]
         weights = [None] * days_in_month
 
-        # 해당 월에 해당하는 CareRecord 필터링
-        records = CareRecord.query.filter(
-            CareRecord.dog_id == dog_id,
-            extract('year', CareRecord.date) == year,
-            extract('month', CareRecord.date) == month
+        records = WeightRecord.query.filter(
+            WeightRecord.dog_id == dog_id,
+            extract('year', WeightRecord.date) == year,
+            extract('month', WeightRecord.date) == month
         ).all()
 
         for record in records:
@@ -42,7 +41,7 @@ def get_weight_chart():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-#연도별 차트(월별 체중 12개)
+# 연간 체중 그래프: 월별 평균 체중 (12개)
 @chart_bp.route('/chart/weight/yearly', methods=['GET'])
 def get_yearly_weight_chart():
     dog_id = request.args.get('dog_id', type=int)
@@ -52,22 +51,18 @@ def get_yearly_weight_chart():
         return jsonify({'error': 'dog_id and year are required'}), 400
 
     try:
-        # 1월부터 12월까지 평균 체중을 담을 리스트
         monthly_avg_weights = [None] * 12
 
-        # 해당 강아지의 연도별 기록을 모두 가져오기
-        records = CareRecord.query.filter(
-            CareRecord.dog_id == dog_id,
-            extract('year', CareRecord.date) == year
+        records = WeightRecord.query.filter(
+            WeightRecord.dog_id == dog_id,
+            extract('year', WeightRecord.date) == year
         ).all()
 
-        # 월별로 체중 데이터를 그룹핑
         weight_data_by_month = {month: [] for month in range(1, 13)}
         for record in records:
             if record.weight is not None:
                 weight_data_by_month[record.date.month].append(float(record.weight))
 
-        # 월별 평균 체중 계산 (리스트에서 30개의 요소를 가져와 평균값을 해당 월에 대입)
         for month in range(1, 13):
             weights = weight_data_by_month[month]
             if weights:
@@ -77,6 +72,153 @@ def get_yearly_weight_chart():
             'dog_id': dog_id,
             'year': year,
             'monthly_avg_weights': monthly_avg_weights
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# 월간 산책량 API
+@chart_bp.route('/chart/walk/distance', methods=['GET'])
+def get_walk_distance_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+
+    if not dog_id or not year or not month:
+        return jsonify({'error': 'dog_id, year, month are required'}), 400
+
+    try:
+        days_in_month = calendar.monthrange(year, month)[1]
+        walk_sums = [0.0] * days_in_month
+
+        records = WalkRecord.query.filter(
+            WalkRecord.dog_id == dog_id,
+            extract('year', WalkRecord.date_time) == year,
+            extract('month', WalkRecord.date_time) == month
+        ).all()
+
+        for record in records:
+            day = record.date_time.day
+            walk_sums[day - 1] += float(record.walk_distance)
+
+        walks = [round(w, 2) if w > 0 else None for w in walk_sums]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'year': year,
+            'month': month,
+            'walk_distances': walks
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 월간 산책시간 API
+@chart_bp.route('/chart/walk/duration', methods=['GET'])
+def get_walk_duration_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+
+    if not dog_id or not year or not month:
+        return jsonify({'error': 'dog_id, year, month are required'}), 400
+
+    try:
+        days_in_month = calendar.monthrange(year, month)[1]
+        duration_sums = [0] * days_in_month
+
+        records = WalkRecord.query.filter(
+            WalkRecord.dog_id == dog_id,
+            extract('year', WalkRecord.date_time) == year,
+            extract('month', WalkRecord.date_time) == month
+        ).all()
+
+        for record in records:
+            day = record.date_time.day
+            duration_sums[day - 1] += record.walk_duration
+
+        durations = [d if d > 0 else None for d in duration_sums]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'year': year,
+            'month': month,
+            'walk_durations': durations  # 단위: 초
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    
+# 월간 간식/식사량 합계 차트
+@chart_bp.route('/chart/meal', methods=['GET'])
+def get_meal_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+
+    if not dog_id or not year or not month:
+        return jsonify({'error': 'dog_id, year, month are required'}), 400
+
+    try:
+        days_in_month = calendar.monthrange(year, month)[1]
+        meal_sums = [0] * days_in_month  # 하루마다 누적합 저장
+
+        records = Meal.query.filter(
+            Meal.dog_id == dog_id,
+            extract('year', Meal.meal_datetime) == year,
+            extract('month', Meal.meal_datetime) == month
+        ).all()
+
+        for record in records:
+            day = record.meal_datetime.day
+            meal_sums[day - 1] += int(record.meal_amount)
+
+        # 0은 None으로 표시 (미기록일 경우)
+        meals = [s if s > 0 else None for s in meal_sums]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'year': year,
+            'month': month,
+            'meals': meals
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+# 일간 식사/간식 시간별 차트 (1시간 단위)
+@chart_bp.route('/chart/meal/daily', methods=['GET'])
+def get_meal_daily_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    date_str = request.args.get('date')  # YYYY-MM-DD
+
+    if not dog_id or not date_str:
+        return jsonify({'error': 'dog_id and date are required'}), 400
+
+    try:
+        start = datetime.fromisoformat(date_str)
+        end = start + timedelta(days=1)
+
+        records = Meal.query.filter(
+            Meal.dog_id == dog_id,
+            Meal.meal_datetime >= start,
+            Meal.meal_datetime < end
+        ).all()
+
+        hourly_sums = [0] * 24
+
+        for record in records:
+            hour = record.meal_datetime.hour
+            hourly_sums[hour] += int(record.meal_amount)
+
+        meals = [s if s > 0 else None for s in hourly_sums]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'date': date_str,
+            'meals': meals  # 각 index는 시간 (0~23시)
         })
 
     except Exception as e:
