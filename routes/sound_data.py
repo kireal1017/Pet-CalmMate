@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify
 from models import db, SoundAnalysis, Device
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # device_id 또는 dog_id 기준으로 저장
 sound_history = defaultdict(list)
@@ -69,11 +69,12 @@ def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     return anxiety_level
 
 # 🔹 DB에 데이터 저장하는 함수
-def save_to_db(dog_id, anxiety_level, sound_features):
+def save_to_db(dog_id, anxiety_level, sound_features, record_date):
     new_entry = SoundAnalysis(
         dog_id=dog_id,
         anxiety_level=anxiety_level,
-        #sound_features=sound_features
+        record_date=record_date,
+        sound_features=sound_features
     )
     db.session.add(new_entry)
     db.session.commit()
@@ -108,10 +109,15 @@ def receive_sound_data():
         save_to_db(
             dog_id=dog_id,
             anxiety_level=anxiety_level,
-            sound_features=sound_type  # 필요하면 json string 등으로 변환
+            sound_features=sound_type,
+            record_date=timestamp_obj
         )
 
-        latest_sound_data = data
+        latest_sound_data = {
+            **data,
+            "anxiety_level": anxiety_level
+        }
+
         return jsonify({"message": "Data received and saved"}), 200
     else:
         return jsonify({"message": "No data received"}), 400
