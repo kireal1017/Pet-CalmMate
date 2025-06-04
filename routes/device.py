@@ -8,6 +8,9 @@ from .mqtt_iotcore import send_mqtt_message
 
 device_bp = Blueprint('device', __name__)
 
+# 음악 상태 저장: dog_id별로 분리
+music_state = {}
+
 @device_bp.route('/dispense-snack', methods=['POST']) #간식주기 API
 def dispense_snack():
     data = request.get_json()
@@ -54,11 +57,12 @@ def dispense_snack():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+#음악 재생 요청 -> IoT
 @device_bp.route('/music-play', methods=['POST'])
 def music_play():
     data = request.get_json()
-    dog_id = data.get('dog_id')
-    music_type = str(data.get('type'))  # 반드시 문자열로 전송 (1~5, 0)
+    dog_id = str(data.get('dog_id'))
+    music_type = str(data.get('type'))  # 반드시 문자열로 전송 (0~5)
 
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
@@ -66,16 +70,52 @@ def music_play():
     if music_type not in ['0', '1', '2', '3', '4', '5']:
         return jsonify({'error': 'type must be 0~5'}), 400
 
+    # MQTT 메시지 전송
     message = json.dumps({
         "message": "music",
         "type": music_type
     })
-
     send_mqtt_message("cmd/control", message)
+
+    # 상태 저장
+    is_playing = False if music_type == '0' else True
+    music_state[dog_id] = {
+        "is_playing": is_playing,
+        "type": music_type
+    }
 
     action = "stopped" if music_type == '0' else f"music #{music_type} played"
     return jsonify({'message': f'{action} for dog {dog_id}'}), 200
 
+# 음악 정지 -> IoT
+@device_bp.route('/music-finished', methods=['POST'])
+def music_finished():
+    data = request.get_json()
+    dog_id = str(data.get("dog_id"))
+
+    if not dog_id:
+        return jsonify({"error": "dog_id is required"}), 400
+
+    # 상태 갱신
+    music_state[dog_id] = {
+        "is_playing": False,
+        "type": "0"
+    }
+
+    return jsonify({"message": f"music finished for dog {dog_id}"}), 200
+
+# 음악 상태 확인(정지인지 재생 중인지) Front에서 확인
+@device_bp.route('/music-status', methods=['GET'])
+def get_music_status():
+    dog_id = request.args.get("dog_id")
+
+    if not dog_id:
+        return jsonify({"error": "dog_id is required"}), 400
+
+    state = music_state.get(dog_id, {"is_playing": False, "type": "0"})
+    return jsonify(state), 200
+
+#기기 등록 dog_id <-> device_id 매핑
 @device_bp.route('/register-device', methods=['POST'])
 def register_device():
     data = request.json
