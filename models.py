@@ -112,3 +112,12 @@ class ChatSolution(db.Model):
         self.prompt = prompt
         self.answer = answer
         self.created_at = created_at
+
+class Device(db.Model):
+    __tablename__ = 'Device'
+    device_id = db.Column(db.String(100), primary_key=True)  # ex) 'nyangmeong-device'
+    dog_id = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=False)
+
+    def __init__(self, device_id, dog_id):
+        self.device_id = device_id
+        self.dog_id = dog_id
