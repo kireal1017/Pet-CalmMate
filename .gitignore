@@ -19,3 +19,4 @@ code_update.sh
 restart.sh
 update_log.txt
 nohup.out
+static/
