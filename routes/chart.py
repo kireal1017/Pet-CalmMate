@@ -223,3 +223,85 @@ def get_meal_daily_chart():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# 월간 불안도 차트
+@chart_bp.route('/chart/anxiety', methods=['GET'])
+def get_monthly_anxiety_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+
+    if not dog_id or not year or not month:
+        return jsonify({'error': 'dog_id, year, month are required'}), 400
+
+    try:
+        from models import SoundAnalysis
+        days_in_month = calendar.monthrange(year, month)[1]
+        anxiety_by_day = [[] for _ in range(days_in_month)]
+
+        records = SoundAnalysis.query.filter(
+            SoundAnalysis.dog_id == dog_id,
+            extract('year', SoundAnalysis.record_date) == year,
+            extract('month', SoundAnalysis.record_date) == month
+        ).all()
+
+        for record in records:
+            day = record.record_date.day
+            if record.anxiety_level is not None:
+                anxiety_by_day[day - 1].append(record.anxiety_level)
+
+        daily_avg_anxieties = [
+            round(sum(values)/len(values), 2) if values else None
+            for values in anxiety_by_day
+        ]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'year': year,
+            'month': month,
+            'daily_avg_anxieties': daily_avg_anxieties
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+#일간 불안도 차트
+@chart_bp.route('/chart/anxiety/daily', methods=['GET'])
+def get_daily_anxiety_chart():
+    dog_id = request.args.get('dog_id', type=int)
+    date_str = request.args.get('date')  # YYYY-MM-DD
+
+    if not dog_id or not date_str:
+        return jsonify({'error': 'dog_id and date are required'}), 400
+
+    try:
+        from models import SoundAnalysis
+        start = datetime.fromisoformat(date_str)
+        end = start + timedelta(days=1)
+
+        hourly_anxiety = [[] for _ in range(24)]
+
+        records = SoundAnalysis.query.filter(
+            SoundAnalysis.dog_id == dog_id,
+            SoundAnalysis.record_date >= start,
+            SoundAnalysis.record_date < end
+        ).all()
+
+        for record in records:
+            hour = record.record_date.hour
+            if record.anxiety_level is not None:
+                hourly_anxiety[hour].append(record.anxiety_level)
+
+        hourly_avg_anxieties = [
+            round(sum(values)/len(values), 2) if values else None
+            for values in hourly_anxiety
+        ]
+
+        return jsonify({
+            'dog_id': dog_id,
+            'date': date_str,
+            'hourly_avg_anxieties': hourly_avg_anxieties  # index = 시간(0~23)
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

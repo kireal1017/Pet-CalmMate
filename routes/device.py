@@ -2,7 +2,7 @@
 from flask import Blueprint, jsonify, request
 import json
 from datetime import datetime, timedelta
-from models import Meal
+from models import Meal, Device
 from db import db
 from .mqtt_iotcore import send_mqtt_message
 
@@ -75,3 +75,21 @@ def music_play():
 
     action = "stopped" if music_type == '0' else f"music #{music_type} played"
     return jsonify({'message': f'{action} for dog {dog_id}'}), 200
+
+@device_bp.route('/register-device', methods=['POST'])
+def register_device():
+    data = request.json
+    device_id = data.get("device_id")
+    dog_id = data.get("dog_id")
+
+    if not device_id or not dog_id:
+        return jsonify({"error": "device_id와 dog_id는 필수입니다"}), 400
+
+    existing = Device.query.filter_by(device_id=device_id).first()
+    if existing:
+        return jsonify({"message": "이미 등록된 device_id입니다."}), 400
+
+    new_device = Device(device_id=device_id, dog_id=dog_id)
+    db.session.add(new_device)
+    db.session.commit()
+    return jsonify({"message": "기기 등록 성공"}), 200
