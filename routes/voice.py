@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from .mqtt_iotcore import send_mqtt_message
 import os, uuid, json, threading, time
+from config import EC2_PUBLIC_IP
 
 voice_bp = Blueprint('voice', __name__)
 
@@ -36,7 +37,7 @@ def upload_and_play_voice():
     file.save(filepath)
     print(f"[✅] 파일 저장 완료: {filepath}")
 
-    public_url = f"http://54.180.212.150/static/voice/{filename}"
+    public_url = f"http://{EC2_PUBLIC_IP}/static/voice/{filename}"
     message = {
         "message": "speaker",
         "url": public_url
