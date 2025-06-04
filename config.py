@@ -17,6 +17,6 @@ DB_NAME = os.getenv("DB_NAME")
 
 SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:3306/{DB_NAME}'
 
-# IVS
-IVS_CHANNEL_NAME = os.getenv("IVS_CHANNEL_NAME")
-IVS_REGION = os.getenv("IVS_REGION")
+EC2_PUBLIC_IP = os.getenv("EC2_IP")
+RTMP_STREAM_ID = os.getenv("RTMP_STREAM_ID")
+HLS_BASE_URL = f"http://{EC2_PUBLIC_IP}/hls"
