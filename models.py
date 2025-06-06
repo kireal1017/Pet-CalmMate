@@ -1,4 +1,5 @@
 from db import db
+from datetime import datetime
 
 #실제 RDS 테이블 구조와 일치
 class User(db.Model):
@@ -88,15 +89,28 @@ class SoundAnalysis(db.Model):
     __tablename__ = 'SoundAnalysis'
     analysis_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     dog_id = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=False)
-    record_datetime = db.Column(db.DateTime, nullable=False)
+    record_date = db.Column(db.DateTime, nullable=False)
     anxiety_level = db.Column(db.Integer)
     sound_features = db.Column(db.String(255))
-    '''
+
     def __init__(self, dog_id, record_date, anxiety_level, sound_features):
         self.dog_id = dog_id
         self.record_date = record_date
         self.anxiety_level = anxiety_level
-        self.sound_features = sound_features '''
+        self.sound_features = sound_features
+        
+
+# 소리 감지 알림을 저장할 테이블
+class SoundAlert(db.Model):
+    __tablename__ = 'sound_alert'
+
+    id           = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    dog_id       = db.Column(db.Integer, nullable=False)            # 감지 대상 강아지 ID
+    sound_level  = db.Column(db.Float, nullable=False)              # 감지된 소리 레벨 (데시벨 등)
+    alert_time   = db.Column(db.DateTime, default=datetime.utcnow)  # 알림 발생 시각
+
+    def __repr__(self):
+        return f"<SoundAlert id={self.id} dog_id={self.dog_id} level={self.sound_level}>"
 
 
 class ChatSolution(db.Model):
@@ -115,9 +129,18 @@ class ChatSolution(db.Model):
 
 class Device(db.Model):
     __tablename__ = 'Device'
-    device_id = db.Column(db.String(100), primary_key=True)  # ex) 'nyangmeong-device'
-    dog_id = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=False)
+    device_id     = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    serial_number = db.Column(db.String(100), unique=True, nullable=False)
+    owner_id      = db.Column(db.Integer, db.ForeignKey('User.user_id'), nullable=False)
+    push_token    = db.Column(db.String(255), nullable=False)
+    dog_id        = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=True)
+    created_at    = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
-    def __init__(self, device_id, dog_id):
-        self.device_id = device_id
-        self.dog_id = dog_id
+    def __init__(self, serial_number, owner_id, push_token, dog_id=None):
+        self.serial_number = serial_number
+        self.owner_id = owner_id
+        self.push_token    = push_token
+        self.dog_id        = dog_id
+
+    def __repr__(self):
+        return f"<Device id={self.device_id} serial={self.serial_number} owner={self.owner_id}, dog={self.dog_id}>"

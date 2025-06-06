@@ -1,38 +1,55 @@
-from flask import Flask, request, jsonify, Response
+import os
+import logging
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from db import db 
-import os, logging
-from dotenv import load_dotenv # <- config.py 에서 .env 파일을 읽어오기때문에 불필요해 보임
-from config import SQLALCHEMY_DATABASE_URI
-from config import JWT_SECRET_KEY,JWT_ACCESS_TOKEN_EXPIRES_DELTA
-from routes import blueprints
 from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
+from flask_migrate import Migrate
+from config import SQLALCHEMY_DATABASE_URI, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES_DELTA
+from db import db
+from routes import blueprints
+load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
+def create_app():
+    app = Flask(__name__)
 
-# SQLAlchemy 설정 (즉, RDS 데이터베이스로 설정)
-app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)  # 등록 필수
+    # ── 1) 기본 설정 ───────────────────────────────────────────────────────────────
+    # CORS 활성화
+    CORS(app)
 
-# JWT 설정
-# .env 에 JWT_SECRET_KEY 와 JWT_ACCESS_TOKEN_EXPIRES (초 단위) 를 추가해 둡니다.
-app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = JWT_ACCESS_TOKEN_EXPIRES_DELTA
+    # SQLAlchemy 설정 (예: RDS MySQL 또는 SQLite 등)
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-jwt = JWTManager(app)
+    # JWT 설정
+    app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = JWT_ACCESS_TOKEN_EXPIRES_DELTA
 
-# 블루프린트 등록
-for bp in blueprints:
-    app.register_blueprint(bp, url_prefix='/api')
+    # ── 2) 확장 모듈 초기화 ───────────────────────────────────────────────────────
+    # SQLAlchemy
+    db.init_app(app)
 
-#개발용 연결 확인 메인페이지
-@app.route('/')
-def home():
-    return "Hello, Flask!"
+    # Flask-Migrate 초기화
+    migrate = Migrate(app, db)
 
-# 🔄 로깅 설정
+    # JWTManager
+    jwt = JWTManager(app)
+
+    # ── 3) 블루프린트 등록 ───────────────────────────────────────────────────────
+    # routes/__init__.py에서 정의된 blueprints 리스트를 순회하며 등록
+    for bp in blueprints:
+        # 모든 블루프린트는 '/api' 하위에 붙도록 설정하려면 url_prefix를 '/api'로 지정
+        app.register_blueprint(bp, url_prefix='/api')
+
+    # ── 4) 라우트 추가 (테스트용) ─────────────────────────────────────────────────
+    @app.route('/', methods=['GET'])
+    def home():
+        return jsonify({'message': 'Hello, Flask! 서버가 정상 작동 중입니다.'}), 200
+
+    return app
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 로깅 설정 (로그 파일: flask_app.log)
 logging.basicConfig(
     filename='flask_app.log',
     level=logging.INFO,
@@ -40,18 +57,21 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# 🔄 모든 요청을 로깅
-@app.before_request
-def log_request_info():
-    app.logger.info(f"Request Method: {request.method} | Path: {request.path} | IP: {request.remote_addr}")
-    app.logger.info(f"Headers: {request.headers}")
-    if request.method in ['POST', 'PUT', 'PATCH']:
-        if request.content_type and 'application/json' in request.content_type:
-            app.logger.info(f"Payload: {request.get_json()}")
-        else:
-            app.logger.info("Payload: [multipart/form-data or other]")
+# 모든 요청을 로그에 남깁니다.
+# (POST, PUT, PATCH 요청 시 JSON 페이로드도 함께 기록)
+def configure_logging(app):
+    @app.before_request
+    def log_request_info():
+        app.logger.info(f"Request Method: {request.method} | Path: {request.path} | IP: {request.remote_addr}")
+        app.logger.info(f"Headers: {dict(request.headers)}")
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            if request.content_type and 'application/json' in request.content_type:
+                app.logger.info(f"Payload: {request.get_json()}")
+            else:
+                app.logger.info("Payload: [multipart/form-data or other]")
 
-
-#시작
 if __name__ == '__main__':
-    app.run(debug=os.getenv("DEBUG", "True") == "True") #실제 배포 시에 .env에서 DEBUG=False로 바꾼다. False:실배포/운영, True:개발/테스트
+    app = create_app()
+    configure_logging(app)
+    debug_mode = os.getenv("DEBUG", "True") == "True"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
