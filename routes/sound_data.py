@@ -1,26 +1,37 @@
-# sound_data.py
-from flask import Blueprint, request, jsonify
-from models import db, SoundAnalysis, Device
+# routes/sound_data.py
+
+import json
+import time
+from threading import Lock
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-# device_id 또는 dog_id 기준으로 저장
-sound_history = defaultdict(list)
+from flask import Blueprint, request, jsonify, Response, current_app
+from models import db, SoundAnalysis, Device
 
 # Blueprint 생성
-sound_data_bp = Blueprint('sound', __name__)
+sound_data_bp = Blueprint('sound_data', __name__)
 
-# 데이터 저장용 변수
+# 데이터 저장용 변수 (GET /dog-sound 용)
 latest_sound_data = {}
 
-#dog_id<->device_id
+# 짖음 이력을 남겨두는 저장소 (dog_id별 타임스탬프 리스트)
+sound_history = defaultdict(list)
+
+# 알림 이벤트 큐 (SSE용)
+notification_queue = []
+queue_lock = Lock()
+
+
+# dog_id 얻어오기 (device_id → dog_id)
 def get_dog_id_from_device(device_id):
     device = Device.query.filter_by(device_id=device_id).first()
     return device.dog_id if device else None
 
-#불안도레벨 자동부여
+
+# 불안도 레벨 계산 함수
 def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
-    # 기본 점수 테이블
+    # 기본 점수 맵
     base_score_map = {
         "Sad": 3,
         "Lonely": 2,
@@ -39,21 +50,19 @@ def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     else:
         weight = 0.5
 
-    # 최근 5분간 짖은 횟수 기록 반영
+    # 최근 5분간 짖은 횟수 이력 조회
     now = timestamp
     window_start = now - timedelta(minutes=5)
-
-    # 해당 dog_id의 기록 불러오기
     recent_times = sound_history[dog_id]
 
-    # 현재 timestamp 추가
+    # 현재 시간 추가
     recent_times.append(now)
 
-    # 5분 이내로 필터링
+    # 5분 이내 타임스탬프만 남겨두기
     sound_history[dog_id] = [t for t in recent_times if t >= window_start]
     recent_count = len(sound_history[dog_id])
 
-    # 짖은 횟수 보정치 계산
+    # 활동 보정치 (activity bonus)
     if recent_count >= 10:
         activity_bonus = 3
     elif recent_count >= 5:
@@ -63,12 +72,13 @@ def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     else:
         activity_bonus = 0
 
-    # 최종 anxiety level 계산 (1~10 범위 제한)
+    # 최종 anxiety level 계산 (최대 10으로 제한)
     raw_score = base_score * weight + activity_bonus
     anxiety_level = int(min(raw_score, 10))
     return anxiety_level
 
-# 🔹 DB에 데이터 저장하는 함수
+
+# DB에 데이터 저장
 def save_to_db(dog_id, anxiety_level, sound_features, record_datetime):
     new_entry = SoundAnalysis(
         dog_id=dog_id,
@@ -79,53 +89,116 @@ def save_to_db(dog_id, anxiety_level, sound_features, record_datetime):
     db.session.add(new_entry)
     db.session.commit()
 
-# POST 요청을 받는 엔드포인트 생성
+
+# 알림 큐에 짖음 이벤트 추가
+def enqueue_bark_alert(dog_id, timestamp):
+    alert = {
+        "dog_id": dog_id,
+        "alert_time": timestamp.isoformat(),
+        "message": "강아지가 짖음이 감지되었습니다!"
+    }
+    with queue_lock:
+        notification_queue.append(alert)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/dog-sound : 새로운 사운드 데이터 수신
 @sound_data_bp.route('/dog-sound', methods=['POST'])
 def receive_sound_data():
     global latest_sound_data
-    data = request.json
-    print("📌 Received Data:", data)
 
-    if data:
-        device_id = data.get("device_id")
-        sound_type = data.get("sound_type")
-        confidence = data.get("confidence")
-        timestamp = data.get("timestamp")
+    data = request.get_json()
+    current_app.logger.info(f"Received Data: {data}")
 
-        dog_id = get_dog_id_from_device(device_id)
-        if not dog_id:
-            return jsonify({"error": "등록되지 않은 device_id입니다"}), 400
-
-        # 예: 불안도 계산
-        timestamp_str = data.get("timestamp")
-        timestamp_obj = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-
-        anxiety_level = calculate_anxiety_level(
-            sound_type=sound_type,
-            confidence=confidence,
-            dog_id=dog_id,
-            timestamp=timestamp_obj )
-        # DB 저장
-        save_to_db(
-            dog_id=dog_id,
-            anxiety_level=anxiety_level,
-            sound_features=sound_type,
-            record_datetime=timestamp_obj
-        )
-
-        latest_sound_data = {
-            **data,
-            "anxiety_level": anxiety_level
-        }
-
-        return jsonify({"message": "Data received and saved"}), 200
-    else:
+    if not data:
         return jsonify({"message": "No data received"}), 400
 
-# 프론트엔드로 전달할 엔드포인트 생성
+    # 필수 필드 가져오기
+    device_id = data.get("device_id")
+    sound_type = data.get("sound_type")
+    confidence = data.get("confidence")
+    timestamp_str = data.get("timestamp")
+
+    if not (device_id and sound_type and confidence is not None and timestamp_str):
+        return jsonify({"error": "device_id, sound_type, confidence, timestamp 모두 필요"}), 400
+
+    # device_id → dog_id 매핑
+    dog_id = get_dog_id_from_device(device_id)
+    if not dog_id:
+        return jsonify({"error": "등록되지 않은 device_id입니다"}), 400
+
+    # timestamp 문자열을 datetime 객체로 변환
+    try:
+        record_datetime = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return jsonify({"error": "timestamp 형식은 'YYYY-MM-DD HH:MM:SS' 이어야 합니다."}), 400
+
+    # anxiety level 계산
+    try:
+        confidence_val = float(confidence)
+    except (ValueError, TypeError):
+        return jsonify({"error": "confidence는 숫자여야 합니다."}), 400
+
+    anxiety_level = calculate_anxiety_level(
+        sound_type=sound_type,
+        confidence=confidence_val,
+        dog_id=dog_id,
+        timestamp=record_datetime
+    )
+
+    # DB에 저장
+    save_to_db(
+        dog_id=dog_id,
+        anxiety_level=anxiety_level,
+        sound_features=sound_type,
+        record_datetime=record_datetime
+    )
+
+    # latest_sound_data 갱신 (클라이언트 GET용)
+    latest_sound_data = {
+        "device_id": device_id,
+        "dog_id": dog_id,
+        "sound_type": sound_type,
+        "confidence": confidence_val,
+        "anxiety_level": anxiety_level,
+        "timestamp": timestamp_str
+    }
+
+    # 짖음 이벤트로 간주하여 알림 큐에 추가
+    enqueue_bark_alert(dog_id, datetime.utcnow())
+
+    return jsonify({"message": "Data received and saved"}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/dog-sound : 가장 최근 사운드 데이터 조회
 @sound_data_bp.route('/dog-sound', methods=['GET'])
 def get_sound_data():
     if latest_sound_data:
         return jsonify(latest_sound_data), 200
     else:
         return jsonify({"message": "No sound data available"}), 404
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/alert-stream : 알림 스트림 (SSE)
+@sound_data_bp.route('/alert-stream')
+def alert_stream():
+    """
+    클라이언트(EventSource)가 연결하여 notification_queue에 쌓인 알림을 실시간 수신.
+    """
+    def event_generator():
+        while True:
+            with queue_lock:
+                if notification_queue:
+                    alert = notification_queue.pop(0)
+                else:
+                    alert = None
+
+            if alert:
+                # SSE 형식: data: {json}\n\n
+                yield f"data: {json.dumps(alert, ensure_ascii=False)}\n\n"
+            else:
+                time.sleep(1)
+
+    return Response(event_generator(), mimetype="text/event-stream")
