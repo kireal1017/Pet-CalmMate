@@ -6,7 +6,7 @@ from .camera import camera_bp
 from .mic import mic_bp
 from .sound_data import sound_data_bp
 from .chart import chart_bp
-#from .solution import solution_bp
+from .solution import solution_bp
 from .weight import weight_bp
 from .walk import walk_bp
 from .meal import meal_bp
@@ -16,7 +16,7 @@ from .meal import meal_bp
 blueprints = [
     meal_bp,
     weight_bp,
-    #solution_bp,
+    solution_bp,
     chart_bp,
     user_bp,
     dog_bp,

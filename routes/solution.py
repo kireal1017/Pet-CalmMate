@@ -6,11 +6,11 @@ from calendar import monthrange
 import requests
 from config import EC2_PUBLIC_IP
 
-ai_bp = Blueprint('ai_bp', __name__)
+solution_bp = Blueprint('solution_bp', __name__)
 AI_BASE_URL = f"http://{EC2_PUBLIC_IP}/gemini"  # 실제 AI 서버 주소로 바꿔야 함
 
 #현재건강상태태
-@ai_bp.route('/health-check', methods=['POST'])
+@solution_bp.route('/health-check', methods=['POST'])
 def health_check_from_front():
     data = request.get_json()
     dog_id = data.get('dog_id')
@@ -66,7 +66,7 @@ def health_check_from_front():
         return jsonify({'error': f'AI API 요청 실패: {str(e)}'}), 500
 
 #월말 레포트
-@ai_bp.route('/monthly-report', methods=['POST'])
+@solution_bp.route('/monthly-report', methods=['POST'])
 def monthly_report_from_front():
     data = request.get_json()
     dog_id = data.get('dog_id')
