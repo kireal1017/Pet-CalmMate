@@ -9,7 +9,7 @@ from config import EC2_PUBLIC_IP
 solution_bp = Blueprint('solution_bp', __name__)
 AI_BASE_URL = f"http://{EC2_PUBLIC_IP}/gemini"  # 실제 AI 서버 주소로 바꿔야 함
 
-#현재건강상태태
+#현재건강상태
 @solution_bp.route('/health-check', methods=['POST'])
 def health_check_from_front():
     data = request.get_json()
@@ -74,17 +74,19 @@ def monthly_report_from_front():
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
 
-    # 1. 강아지 정보 조회
     dog = Dog.query.get(dog_id)
     if not dog:
         return jsonify({'error': 'Dog not found'}), 404
 
-    # 2. 오늘 날짜 → 직전 월의 1일 ~ 말일 계산
     today = date.today()
     first_day_of_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-    last_day_of_month = date(first_day_of_month.year, first_day_of_month.month, monthrange(first_day_of_month.year, first_day_of_month.month)[1])
+    last_day_of_month = date(
+        first_day_of_month.year,
+        first_day_of_month.month,
+        monthrange(first_day_of_month.year, first_day_of_month.month)[1]
+    )
 
-    # 3. 체중 변화 리스트 (지난달 1일 ~ 말일)
+    # 체중 변화 리스트
     weight_records = (
         WeightRecord.query
         .filter(
@@ -97,7 +99,7 @@ def monthly_report_from_front():
     )
     weights = [float(w.weight) for w in weight_records]
 
-    # 4. 산책 거리 변화 리스트
+    # 산책 거리 리스트
     walk_records = (
         WalkRecord.query
         .filter(
@@ -110,7 +112,7 @@ def monthly_report_from_front():
     )
     walk_distances = [float(w.walk_distance) for w in walk_records]
 
-    # 5. 불안도 변화 리스트
+    # 불안도 리스트
     anxiety_records = (
         SoundAnalysis.query
         .filter(
@@ -126,13 +128,20 @@ def monthly_report_from_front():
         for a in anxiety_records if a.anxiety_level is not None
     ]
 
-    # 6. 나이 계산 (해당 월 말 기준)
+    # ✅ 길이 31개로 맞추기
+    def pad(lst):
+        return (lst + [0.0] * (31 - len(lst)))[:31]
+
+    weights = pad(weights)
+    walk_distances = pad(walk_distances)
+    anxiety_scores = pad(anxiety_scores)
+
+    # 나이 계산
     age_months = (
         relativedelta(last_day_of_month, dog.birth_date).months +
         relativedelta(last_day_of_month, dog.birth_date).years * 12
     )
 
-    # 7. AI API에 보낼 데이터 구성
     payload = {
         "breed": dog.breed,
         "age_months": age_months,
@@ -141,7 +150,6 @@ def monthly_report_from_front():
         "anxiety_scores": anxiety_scores
     }
 
-    # 8. AI 서버로 POST 요청
     try:
         ai_response = requests.post(f"{AI_BASE_URL}/monthly_report", json=payload)
         ai_response.raise_for_status()
