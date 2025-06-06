@@ -103,7 +103,7 @@ def music_finished():
     }
     message = json.dumps({
         "message": "music",
-        "type": music_type
+        "type": "0"
     })
     send_mqtt_message("cmd/control", message)
     return jsonify({"message": f"music finished for dog {dog_id}"}), 200
