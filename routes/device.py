@@ -67,7 +67,7 @@ def music_play():
     if not dog_id:
         return jsonify({'error': 'dog_id is required'}), 400
 
-    if music_type not in ['0', '1', '2', '3', '4', '5']:
+    if music_type not in ['1', '2', '3', '4', '5']:
         return jsonify({'error': 'type must be 0~5'}), 400
 
     # MQTT 메시지 전송
@@ -101,7 +101,11 @@ def music_finished():
         "is_playing": False,
         "type": "0"
     }
-
+    message = json.dumps({
+        "message": "music",
+        "type": music_type
+    })
+    send_mqtt_message("cmd/control", message)
     return jsonify({"message": f"music finished for dog {dog_id}"}), 200
 
 # 음악 상태 확인(정지인지 재생 중인지) Front에서 확인
