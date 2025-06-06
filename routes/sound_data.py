@@ -18,7 +18,7 @@ def get_dog_id_from_device(device_id):
     device = Device.query.filter_by(device_id=device_id).first()
     return device.dog_id if device else None
 
-#불안도레벨 자동부여여
+#불안도레벨 자동부여
 def calculate_anxiety_level(sound_type, confidence, dog_id, timestamp):
     # 기본 점수 테이블
     base_score_map = {
