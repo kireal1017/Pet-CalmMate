@@ -8,14 +8,14 @@ load_dotenv()
 app = FastAPI()
 API_KEY = os.getenv("GEMINI_API_KEY")
 
-# ✅ 현재 건강 상태 평가용 모델
+# 현재 건강 상태 평가용 모델
 class DogDailyStatus(BaseModel):
     breed: str
     age_months: int
     weight_kg: float
     walk_km: float  # 오늘 산책 거리
 
-# ✅ 월말 리포트 평가용 모델 (나이 포함)
+# 월말 리포트 평가용 모델 (나이 포함)
 class DogMonthlyStatus(BaseModel):
     breed: str
     age_months: int
@@ -23,7 +23,7 @@ class DogMonthlyStatus(BaseModel):
     walk_distances: List[float] = Field(..., min_items=31, max_items=31)
     anxiety_scores: List[float] = Field(..., min_items=31, max_items=31)
 
-# ✅ Gemini 호출 함수 (3~4줄 요약 요청 포함)
+# Gemini 호출 함수 (3~4줄 요약 요청 포함)
 def call_gemini(prompt: str):
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
     headers = {"Content-Type": "application/json"}
@@ -36,7 +36,7 @@ def call_gemini(prompt: str):
         "solution": response.json()["candidates"][0]["content"]["parts"][0]["text"]
     }
 
-# ✅ 현재 건강 상태 평가 API
+# 현재 건강 상태 평가 API
 @app.post("/check_health")
 def check_health(info: DogDailyStatus):
     prompt = f"""
@@ -51,7 +51,7 @@ def check_health(info: DogDailyStatus):
     """
     return call_gemini(prompt)
 
-# ✅ 월말 평가 API
+# 월말 평가 API
 @app.post("/monthly_report")
 def monthly_report(data: DogMonthlyStatus):
     prompt = f"""
