@@ -117,10 +117,10 @@ def monthly_report_from_front():
         SoundAnalysis.query
         .filter(
             SoundAnalysis.dog_id == dog_id,
-            SoundAnalysis.record_datetime >= datetime.combine(first_day_of_month, datetime.min.time()),
-            SoundAnalysis.record_datetime <= datetime.combine(last_day_of_month, datetime.max.time())
+            SoundAnalysis.record_date >= datetime.combine(first_day_of_month, datetime.min.time()),
+            SoundAnalysis.record_date <= datetime.combine(last_day_of_month, datetime.max.time())
         )
-        .order_by(SoundAnalysis.record_datetime.asc())
+        .order_by(SoundAnalysis.record_date.asc())
         .all()
     )
     anxiety_scores = [
