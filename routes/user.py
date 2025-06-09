@@ -54,7 +54,7 @@ def login():
         if not user or not check_password_hash(user.password, password):
             return jsonify({'error': 'Invalid email or password'}), 401
 
-        access_token = create_access_token(identity=user.user_id)
+        access_token = create_access_token(identity=str(user.user_id))
         return jsonify({'access_token': access_token}), 200
     except Exception as e:
         logging.error(f"[Login Error] {e}")
