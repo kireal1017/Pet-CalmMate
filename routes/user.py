@@ -60,8 +60,6 @@ def login():
         logging.error(f"[Login Error] {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-
-# 🔐 보호된 API 예시
 @user_bp.route('/profile', methods=['GET'])
 @jwt_required()
 def protected_profile():
