@@ -1,7 +1,7 @@
 # routes/camera.py
 from flask import Blueprint, jsonify, request
 from .mqtt_iotcore import send_mqtt_message
-import boto3, json, os
+import json, os
 import logging
 from config import RTMP_STREAM_ID, HLS_BASE_URL, EC2_PUBLIC_IP
 
@@ -19,6 +19,7 @@ def get_hls_stream_url():
         hls_url = f"{HLS_BASE_URL}/{RTMP_STREAM_ID}.m3u8"
         return jsonify({'stream_url': hls_url}), 200
     except Exception as e:
+        logger.error(f"[HLS URL 생성 실패] {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # 📡 카메라 ON API (MQTT 전송)
