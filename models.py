@@ -129,16 +129,18 @@ class ChatSolution(db.Model):
 
 class Device(db.Model):
     __tablename__ = 'Device'
-    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)  # PK
-    device_id     = db.Column(db.String(100), unique=True, nullable=False)       # <- 실제 전송받는 값
+    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    device_id     = db.Column(db.String(100), unique=True, nullable=False)  # POST로 받음
     owner_id      = db.Column(db.Integer, db.ForeignKey('User.user_id'), nullable=True)
     push_token    = db.Column(db.String(255), nullable=True)
-    dog_id        = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=True)
+    dog_id        = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=True)  # POST로 받음
     created_at    = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     def __init__(self, device_id, dog_id=None):
         self.device_id = device_id
         self.dog_id = dog_id
+        self.owner_id = None         # 명시적 초기화 (optional 필드)
+        self.push_token = None       # 명시적 초기화 (optional 필드)
 
     def __repr__(self):
         return f"<Device device_id={self.device_id}, dog_id={self.dog_id}>"
