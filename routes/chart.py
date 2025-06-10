@@ -251,7 +251,7 @@ def get_monthly_anxiety_chart():
                 anxiety_by_day[day - 1].append(record.anxiety_level)
 
         daily_avg_anxieties = [
-            round(sum(values)/len(values), 2) if values else None
+            round(sum(values)/len(values), 2) if values else 0
             for values in anxiety_by_day
         ]
 
@@ -294,7 +294,7 @@ def get_daily_anxiety_chart():
                 hourly_anxiety[hour].append(record.anxiety_level)
 
         hourly_avg_anxieties = [
-            round(sum(values)/len(values), 2) if values else None
+            round(sum(values)/len(values), 2) if values else 0
             for values in hourly_anxiety
         ]
 
