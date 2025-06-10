@@ -215,3 +215,50 @@ def alert_stream():
                 time.sleep(1)
 
     return Response(event_generator(), mimetype="text/event-stream")
+
+# GET 불안도
+@sound_data_bp.route('/anxiety/list', methods=['GET']) # 또는 anxiety_bp.route
+def get_anxiety_records_by_date():
+    dog_id = request.args.get('dog_id', type=int)
+    date_str = request.args.get('date') # "YYYY-MM-DD" 형식
+
+    # 필수 파라미터 확인
+    if not dog_id or not date_str:
+        return jsonify({'error': 'dog_id와 date는 필수입니다'}), 400
+
+    try:
+        # 날짜 파싱
+        # 주어진 날짜의 시작 시간 (00:00:00)
+        day_start = datetime.fromisoformat(date_str)
+        # 주어진 날짜의 다음 날 시작 시간 (24:00:00)
+        day_end = day_start + timedelta(days=1)
+
+        # 해당 날짜 범위 내의 SoundAnalysis 기록 필터링
+        # record_date 컬럼을 사용합니다 (이전 오류 해결에 기반함)
+        records = SoundAnalysis.query.filter(
+            SoundAnalysis.dog_id == dog_id,
+            SoundAnalysis.record_date >= day_start,
+            SoundAnalysis.record_date < day_end
+        ).order_by(SoundAnalysis.record_date).all() # 시간 순서대로 정렬
+
+        result = []
+        for record in records:
+            result.append({
+                'analysis_id': record.analysis_id,
+                'record_date': record.record_date.isoformat(), # ISO 8601 형식으로 변환
+                'sound_type': record.sound_features, # sound_features는 sound_type을 저장한다고 가정
+                'anxiety_level': record.anxiety_level
+            })
+
+        return jsonify({
+            'dog_id': dog_id,
+            'date': date_str,
+            'records': result
+        })
+
+    except ValueError:
+        # 날짜 형식 오류 처리
+        return jsonify({'error': "잘못된 날짜 형식입니다. 'YYYY-MM-DD' 형식을 사용하세요."}), 400
+    except Exception as e:
+        # 기타 예외 처리
+        return jsonify({'error': str(e)}), 500
