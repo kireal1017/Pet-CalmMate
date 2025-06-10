@@ -44,7 +44,7 @@ def upload_and_play_voice():
     print(f"[📤] MQTT 전송: {json.dumps(message)}")
     send_mqtt_message("cmd/control", json.dumps(message))
 
-    threading.Thread(target=delayed_delete, args=(filepath, 30)).start()
+    threading.Thread(target=delayed_delete, args=(filepath, 5)).start()
     print("[🚀] 삭제 스레드 실행됨")
 
     return jsonify({'result': 'ok', 'message': 'voice speak complete'})
