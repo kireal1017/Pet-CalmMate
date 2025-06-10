@@ -38,7 +38,7 @@ def dispense_snack():
 
         if existing_snack:
             # 이미 있다면 meal_amount +1
-            existing_snack.meal_amount += 1
+            existing_snack.meal_amount = str(int(existing_snack.meal_amount) + 1)
             existing_snack.meal_datetime = now  # 마지막 시간 업데이트
         else:
             # 없으면 새로 생성
@@ -51,7 +51,7 @@ def dispense_snack():
             db.session.add(new_snack)
 
         db.session.commit()
-        return jsonify({'message': f'Snack dispensed and recorded for dog {dog_id}'}), 200
+        return jsonify({'message': f'간식 배출에 성공했습니다. {dog_id}'}), 200
 
     except Exception as e:
         db.session.rollback()
