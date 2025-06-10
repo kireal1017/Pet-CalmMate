@@ -1,107 +1,164 @@
-# 시작 프로그램은 /etc/systemd/system/petcalmmate_script.service 로 등록되어있음.
+# 시작 프로그램은 /etc/systemd/system/petcalmmate_script.service 로 등록되어있음. 
+# 이 파일 수정할거면 sudo systemctl stop petcalmmate_script.service로 꺼둔 다음에 수정할것
+
 import RPi.GPIO as GPIO
-import time, subprocess
+import time, subprocess, board, neopixel, threading, os
+
+# 버튼 핀
+BUTTON_PIN = 17
+
+# 네오픽셀 설정
+PIXEL_PIN = board.D18
+NUM_PIXELS = 1
+pixels = neopixel.NeoPixel(PIXEL_PIN, NUM_PIXELS, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
+
+# state 색상
+COLOR_OFF = (0, 0, 0)
+COLOR_YELLOW = (255, 150, 0)
+COLOR_RED = (255, 0, 0)
+COLOR_GREEN = (0, 255, 0)
+
+# 상태 변수
+is_power_on = False
+mainprocess = None
+last_network_check = 0
+NETWORK_CHECK_INTERVAL = 10  # 초 단위로 체크함
+
+# GPIO 설정
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
+# 네트워크 연결 확인 함수
 def is_network_connected():
     try:
-        result = subprocess.check_output(['nmcli', '-t', '-f', 'CONNECTIVITY', 'general'])  # nmcli 명령어로 네트워크 연결 상태 확인
-        return result.strip() == b'full'                                                    # 'full' 상태면 연결됨
-    except subprocess.CalledProcessError:
+        result = subprocess.check_output(['nmcli', '-t', '-f', 'CONNECTIVITY', 'general'])
+        return result.strip() == b'full'
+    except subprocess.CalledProcessError: # 네트워크 연결 실패시 false 반환
         return False
 
+# 네트워크 연결 대기 + 점멸 애니메이션
 def wait_for_network(timeout=60):
-    print("네트워크 연결 대기 중")
     start = time.time()
     while time.time() - start < timeout:
         if is_network_connected():
-            print("네트워크 연결 확인됨 (nmcli)")
             return True
-        time.sleep(1)
-    print("네트워크 연결 실패 (timeout)")
+        pixels[0] = COLOR_YELLOW
+        time.sleep(0.3)
+        pixels[0] = COLOR_OFF
+        time.sleep(0.3)
     return False
 
+def stream_stdout(pipe):
+    for line in iter(pipe.readline, ''):
+        print(f"[aws_project.py] {line.strip()}")
 
-# ----------------------------------------------------------------- 시작 -----------------------------------------------------------------
+def start_mainprocess():
+    global is_power_on, mainprocess
+    if not is_power_on:
+        try:
+            # 명시적으로 nohup 사용하여 완전 분리
+            command = (
+                "sudo -u kireal1017 env HOME=/home/kireal1017 "
+                "setsid nohup python3 /home/kireal1017/petcalmmate_project/aws_project.py "
+                "> /tmp/aws_log.txt 2>&1 < /dev/null &"
+            )
+            
+            subprocess.Popen(
+                ["bash", "-c", command]
+            )
+            
+            is_power_on = True
+            pixels[0] = COLOR_GREEN
+            print("전원 ON, aws_project.py 백그라운드로 실행")
+        except Exception as e:
+            print(f"메인 프로세스 실행 실패: {e}")
+            is_power_on = False
+    else:
+        print("이미 실행 중")
+        
+    
+def stop_mainprocess():
+    global is_power_on, mainprocess
+    if is_power_on:
+        is_power_on = False
+        if mainprocess:
+            try:
+                mainprocess.terminate()
+                mainprocess.wait()
+                mainprocess = None
+            except Exception as e:
+                print(f"프로세스 종료 실패: {e}")
+        pixels[0] = COLOR_RED
+        print("전원 OFF")
+    else:
+        print("이미 꺼져 있음")
 
-# 핀 설정
-BUTTON_PIN = 17                     # 버튼 입력 핀
-LED_STATE_ALLREADY = 23             # 대기 중 LED 출력 핀
-LED_STATE_NET_ERROR = 22            # 네트워크 오류 LED 출력 핀
-LED_STATE_POWER_ON = 27             # 전원 ON 상태 LED 출력 핀
 
-# GPIO 설정 
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup([LED_STATE_ALLREADY, LED_STATE_NET_ERROR, LED_STATE_POWER_ON], GPIO.OUT, initial=GPIO.LOW) #처음에는모두 끔끔
-
-
-is_power_on = False
-mainprocess = None  # aws_project.py 프로세스 변수
-
-
+# 시작 시 네트워크 연결 대기
 while not wait_for_network(timeout=60):
-    GPIO.output(LED_STATE_NET_ERROR, GPIO.HIGH)  # 네트워크 오류 LED 켜기
-    print("네트워크 미연결 상태, 1초 후 재시도")
-    time.sleep(1)
-    
+    print("네트워크 연결 대기 중...")
 
-    
-# if not wait_for_network(timeout=60):
-#     print("네트워크 미연결 상태, 프로그램 종료")
-#     exit(1)
+pixels[0] = COLOR_RED  # 네트워크 연결 완료, 초기 대기 상태
 
+time.sleep(5)   # 초기 대기 시간
 
-print("버튼 제어 시작")
-GPIO.output(LED_STATE_NET_ERROR, GPIO.LOW)  # 네트워크 오류 LED 끄기
-GPIO.output(LED_STATE_ALLREADY, GPIO.HIGH)  # 대기 상태 LED 켜기
-
+# 메인 프로세스 시작
 try:
+    
+    was_button_pressed = False
+    press_start = 0
+    long_press_handled = False
+
     while True:
-        if GPIO.input(BUTTON_PIN) == GPIO.HIGH:
-            press_start = time.time()
+        current_time = time.time()
 
-            # 버튼이 눌린 동안 시간 측정
-            while GPIO.input(BUTTON_PIN) == GPIO.HIGH:
-                duration = time.time() - press_start
+        # 네트워크 상태 주기적 확인
+        if current_time - last_network_check >= NETWORK_CHECK_INTERVAL:
+            last_network_check = current_time
+            if not is_network_connected():
+                print("네트워크 끊김!")
+                pixels[0] = COLOR_YELLOW
+                stop_mainprocess()
+            # else:
+            #     print("네트워크 연결 유지 중")
 
-                # 3초 이상이면 즉시 전원 OFF
-                if duration >= 3:
-                    if is_power_on:
-                        is_power_on = False
-                        GPIO.output(LED_STATE_POWER_ON, GPIO.LOW)   # 전원 ON 상태 LED 끄기
-                        GPIO.output(LED_STATE_ALLREADY, GPIO.HIGH)  # 대기 상태로 전환
-                        print("전원 OFF")  
-                        if mainprocess is not None:
-                            mainprocess.terminate()
-                            print(f"aws_project.py 프로세스 종료, 대기 상태 전환 (PID: {mainprocess.pid})")
-                            mainprocess = None
-                    else:
-                        print("전원이 꺼져있음")
+        # 버튼 처리
+        button_state = GPIO.input(BUTTON_PIN)
 
-                    # 버튼이 떨어질 때까지 대기
-                    while GPIO.input(BUTTON_PIN) == GPIO.HIGH:
-                        time.sleep(0.01)
-                    break  # 바깥 루프로 돌아가기
+        if button_state == GPIO.LOW:
+            if not was_button_pressed:
+                press_start = time.time()
+                was_button_pressed = True
+                long_press_handled = False
+                print("버튼 눌림 시작")
 
-                time.sleep(0.01)
+            duration = time.time() - press_start
 
-            else:
-                # 3초 미만 → 짧게 누른 것
-                if duration >= 0.05:
-                    if not is_power_on:
-                        is_power_on = True
-                        GPIO.output(LED_STATE_ALLREADY, GPIO.LOW)   # 대기 상태 LED 끄기
-                        GPIO.output(LED_STATE_POWER_ON, GPIO.HIGH)  # 전원 ON 상태 LED 켜기
-                        print("전원 ON")
-                        mainprocess = subprocess.Popen(["python3", "aws_project.py"])  # aws_project.py 실행
-                        print(f"aws_project.py 실행 중 (PID: {mainprocess.pid})")
-                    else:
-                        print("전원 켜짐")
+            # if duration >= 3 and not long_press_handled:
+            #     stop_mainprocess()
+            #     print("메인 프로세스 종료")
+            #     long_press_handled = True
 
-        time.sleep(0.05)
+        elif button_state == GPIO.HIGH and was_button_pressed:
+            was_button_pressed = False
+            duration = time.time() - press_start
+            # print(f"버튼 뗀 시점: {time.time():.2f}")
+            # print(f"총 누른 시간: {duration:.2f}초")
 
+            if duration < 3 and duration >= 0.05 and not long_press_handled:
+                start_mainprocess()
+                print("메인 프로세스")
+        
+
+        time.sleep(0.01)
+        
 except KeyboardInterrupt:
-    print("\n프로그램 종료")
+    print("\n종료 중...")
+
 finally:
-    GPIO.cleanup()
+    if mainprocess:
+        mainprocess.terminate()
+    pixels.fill(COLOR_OFF)
+    
+    # 이 파일 수정할거면 sudo systemctl stop petcalmmate_script.service로 꺼둔 다음에 수정할것
