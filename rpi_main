@@ -1,13 +1,14 @@
 from aws_privatekey import * # 예민한 정보는 별도 보관할 것
 
+# 디바이스 번호
+DEVICE_ID  = "raspberrypi001"
+DEVICE_CONNATION_CODE = "004001"
+
 # 입력받고 보낼 메세지 토픽
 TOPIC_STATUS  = "rpi/status"
 TOPIC_MIC     = "mic/upload" # <- 현재 이거는 아직 안씀
 TOPIC_CONTROL = "cmd/control"
 
-# AI 음성
-SERVER_URL = "http://54.180.212.150/ai/predict"
-DEVICE_ID  = "raspberrypi001"
 
 from awscrt import io, mqtt, auth, http
 from awsiot import mqtt_connection_builder
@@ -15,12 +16,96 @@ from awsiot import mqtt_connection_builder
 
 from serial.tools import list_ports
 
-import time, json, threading, subprocess, serial, pyaudio, wave, datetime, requests, os
-
-
+import time, json, threading, subprocess, pyaudio, wave, datetime, requests, os, pygame, board, neopixel, sys
 import io as std_io #aws io랑 겹쳐서 별도로 이름 넣음, 레코딩에 쓰이는 io임
+import RPi.GPIO as GPIO    # 스텝모터, LED 버튼 제어
 
 
+# 버튼 핀
+BUTTON_PIN = 17
+
+
+
+# 스텝 핀 정의 빨주노초 순
+IN1 = 24
+IN2 = 23
+IN3 = 22
+IN4 = 27
+
+# 부모 프로세스 먼저 종료
+time.sleep(2)  # 잠시 대기
+subprocess.run(["pkill", "-f", "start_setup.py"])
+time.sleep(1)  # 잠시 대기
+
+# GPIO 설정
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+GPIO.setup(IN1, GPIO.OUT)
+GPIO.setup(IN2, GPIO.OUT)
+GPIO.setup(IN3, GPIO.OUT)
+GPIO.setup(IN4, GPIO.OUT)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# 스텝 시퀀스
+step_sequence = [
+    [1,0,0,1],
+    [1,0,0,0],
+    [1,1,0,0],
+    [0,1,0,0],
+    [0,1,1,0],
+    [0,0,1,0],
+    [0,0,1,1],
+    [0,0,0,1]
+]
+
+#-------------------------------------------------------------
+# 전원 제어 클래스
+# class PowerControl:
+#     def __init__(self, button_pin=BUTTON_PIN, pixel_pin=PIXEL_PIN, num_pixels=NUM_PIXELS):
+#         self.button_pin = button_pin
+#         self.pixel_pin = pixel_pin
+#         self.num_pixels = num_pixels
+#         self.is_power_on = False
+#         self.mainprocess = None
+#         self.last_network_check = 0
+#         self.NETWORK_CHECK_INTERVAL = 10  # 초 단위로 체크함
+        
+#         # 네오픽셀 설정
+#         self.pixels = neopixel.NeoPixel(self.pixel_pin, self.num_pixels, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
+        
+#         # 상태 색상
+#         self.COLOR_OFF = (0, 0, 0)
+#         self.COLOR_YELLOW = (255, 150, 0)
+#         self.COLOR_RED = (255, 0, 0)
+#         self.COLOR_GREEN = (0, 255, 0)
+        
+#         # 상태 변수
+#         self.is_power_on = False
+        
+#         # GPIO 설정
+#         GPIO.setmode(GPIO.BCM)
+#         GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        
+#     def is_network_connected(self):
+#         try:
+#             result = subprocess.check_output(['nmcli', '-t', '-f', 'CONNECTIVITY', 'general'])
+#             return result.strip() == b'full'
+#         except subprocess.CalledProcessError:  # 네트워크 연결 실패시 false 반환
+#             return False
+        
+#     def wait_for_network(self, timeout=60):
+#         start = time.time()
+#         while time.time() - start < timeout:
+#             if self.is_network_connected():
+#                 return True
+#             self.pixels[0] = self.COLOR_YELLOW
+#             time.sleep(0.3)
+#             self.pixels[0] = self.COLOR_OFF
+#             time.sleep(0.3)
+#         return False
+    
+        
 #-------------------------------------------------------------
 
 # IoT 제어 클래스
@@ -32,11 +117,14 @@ class Controller:
         self.is_streaming = False
         self.camera_process = None
         
-        self.PORT = "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_8573531323335120D132-if00"   # 아두이노 포트
-        self.BAUD = 9600             # 시리얼 통신 속도
-        self.TIMEOUT = 1             # usb하고 연결 안됬을 때의 Time out
-        
-    
+        pygame.mixer.init()  # pygame 믹서 초기화
+        self.music_No1 = "/home/kireal1017/petcalmmate_project/example_sound/No1_chopin-nocturne-op-9-no-2-classical-piano-321995.mp3"
+        self.music_No2 = "/home/kireal1017/petcalmmate_project/example_sound/No2_soft-piano-music-322002.mp3"
+        self.music_No3 = "/home/kireal1017/petcalmmate_project/example_sound/No3_waltz-in-a-minor.mp3"
+        self.music_No4 = "/home/kireal1017/petcalmmate_project/example_sound/No4_angels-we-have-heard-on-high-grand-piano-french-christmas-carol-1881.mp3" # 실행시 버그 발생함함
+        self.music_No5 = "/home/kireal1017/petcalmmate_project/example_sound/No5_komm-lieber-mai-und-mache-overbeck-mozart-come-dear-may-and-make-3468.mp3"
+        self.music_playing = False  # 음악 재생 상태 플래그
+
     def on_message_received(self, topic, payload, **kwargs):
         try:
             data = json.loads(payload.decode())
@@ -77,42 +165,92 @@ class Controller:
             return {"status":"rpi_camera_off", **time_stamp}
             
         elif command == "speaker":
-            self.play_speaker()
             url = payload.get("url")
             print(f"sound: {url}")
+            self.play_speaker(url)  # 사용자 목소리 재생
             return {"status":"user_sound", **time_stamp}
+        
+        elif command == "music":
+            type_str = payload.get("type")          # 숫자 0 ~ 5까지
+            try:
+                type_value = int(type_str)          # type이 문자열로 오면 int로 변환
+            except (TypeError, ValueError):
+                print("타입 파싱 오류:", type_str)
+                return {"status": "invalid_type_value", **time_stamp}
             
+            if type_value == 0:
+                self.stop_music()
+                print("음악 종료")
+                return {"status": "music_stopped", **time_stamp}
+            elif 1 <= type_value <= 5:
+                self.play_music(type_value)
+                print(f"{type_value}번 음악 재생")
+                return {"status": f"music_play_{type_value}", **time_stamp}
+            else:
+                print("타입 오류:", type_value)
+                return {"status": "invalid_type_range", **time_stamp}
         else:
-            print("알 수 없는 명령어")
+            print("알 수 없는 명령어", payload)
             return {"status":"unknown_command", **time_stamp}
             
             
-    def play_speaker(self):
+    def play_speaker(self, url):
         # 스피커 재생 코드
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", url])
         print("사용자 목소리 재생")
         pass
     
+    def play_music(self, type_value):
+        # 음악 재생 코드
+        print("음악 재생")
+        if type_value == 1:
+            pygame.mixer.music.load(self.music_No1)
+        elif type_value == 2:
+            pygame.mixer.music.load(self.music_No2)
+        elif type_value == 3:
+            pygame.mixer.music.load(self.music_No3)
+        elif type_value == 4:
+            pygame.mixer.music.load(self.music_No4)
+        elif type_value == 5:
+            pygame.mixer.music.load(self.music_No5)
+        else:
+            print("음악 타입 오류")
+            return
+        pygame.mixer.music.play(loops=0)  # 음악 재생
+        self.music_playing = True
+        return
+    
+    def stop_music(self):       # 음악 정지 코드
+        if self.music_playing:
+            pygame.mixer.music.stop()
+            self.music_playing = False
+            print("음악 정지")
+        else:
+            print("음악이 재생 중이 아님")
+
     def stop_camera_stream(self):
         # 실행 중인 gst-launch 프로세스 종료
         subprocess.run(["pkill", "gst-launch-1.0"])
         print("카메라 스트리밍 종료")
     
     def start_camera_stream(self):
-        pipeline = (
-        "gst-launch-1.0 autovideosrc "
-        "! videoconvert "
-        "! video/x-raw,format=I420,width=640,height=480 "
-        # x264enc 옵션을 한 덩어리로
-        "! x264enc bframes=0 key-int-max=45 tune=zerolatency byte-stream=true speed-preset=ultrafast "
-        # 1초마다 SPS/PPS 전송
-        "! h264parse config-interval=1 "
-        "! video/x-h264,stream-format=avc,alignment=au,profile=baseline "
-        "! kvssink stream-name=rpi-video"
+        pipeline_kvs = (
+            "ffmpeg -f v4l2 -framerate 30 -video_size 640x480 -i /dev/video0 -c:v libx264 -b:v 1000k -g 30 -keyint_min 30 -preset ultrafast -tune zerolatency -f flv rtmp://54.180.212.150/live/kvs-stream"
+
+        # "gst-launch-1.0 autovideosrc "
+        # "! videoconvert "
+        # "! video/x-raw,format=I420,width=640,height=480 "
+        # # x264enc 옵션을 한 덩어리로
+        # "! x264enc bframes=0 key-int-max=45 tune=zerolatency byte-stream=true speed-preset=ultrafast "
+        # # 1초마다 SPS/PPS 전송
+        # "! h264parse config-interval=1 "
+        # "! video/x-h264,stream-format=avc,alignment=au,profile=baseline "
+        # "! kvssink stream-name=rpi-video"
         )
     
         
         self.camera_process = subprocess.Popen(
-            pipeline, 
+            pipeline_kvs, 
             shell=True,
             executable="/bin/bash",
             stdout=subprocess.DEVNULL,
@@ -124,23 +262,18 @@ class Controller:
     
     
     def snack_signal(self):                                     # 간식 주기 신호
-        """ 포트 연결 > 전송 > 포트 닫기 순으로 동작함 """
-    
-        try:
-            ser = serial.Serial(self.PORT, self.BAUD, timeout=self.TIMEOUT)
-            time.sleep(2)
-            ser.write(bytes([0xF1]))
-        except serial.SerialException as e:
-            print(f"시리얼 전송 실패 {self.PORT}: {e}")
-        finally:
-            if 'ser' in locals() and ser.is_open:
-                ser.close()
+        steps_per_90_deg = 400
+        for i in range(steps_per_90_deg):
+            for step in step_sequence:
+                GPIO.output(IN1, step[0])
+                GPIO.output(IN2, step[1])
+                GPIO.output(IN3, step[2])
+                GPIO.output(IN4, step[3])
+                time.sleep(0.001)
         print("간식 주기 완료")
         
 
-# 녹음 및 S3 업로드 클래스
-# 파라미터(엑세스키, 시크릿키, 버킷이름, 리전이름=기본 아시아, S3 프리픽스)
-
+# 녹음 세션 --------------------------------------------------------------------
 
 class Recording:
     def __init__(self, server_url, device_id, record_seconds=2,
@@ -220,7 +353,13 @@ class Recording:
 
 #------------------------------------------------------------- 여기부터 메인
 
+
 def main():
+    # 전원버튼 제어항목
+    press_start = 0
+    was_pressed = False
+    long_press_handled = False
+        
     # AWS IoT MQTT 연결 준비
     event_loop_group = io.EventLoopGroup(1)
     host_resolver = io.DefaultHostResolver(event_loop_group)
@@ -245,23 +384,22 @@ def main():
     recorder = Recording(
         server_url=SERVER_URL,
         device_id=DEVICE_ID,
-        record_seconds=2
+        record_seconds=3                        # 녹음 시간 (초 단위)
     )
 
     
-    recorder.start()  # 2초 간격으로 녹음 -> 업로드 파이프라인 가동
+    # recorder.start()  # 2초 간격으로 녹음 -> 업로드 파이프라인 가동
     
     
     cont = Controller(mqtt_connection)
         
     mqtt_connection.publish(
         topic=TOPIC_STATUS,
-        payload=json.dumps({"status":"ready"}),
+        payload=json.dumps({"status":"ready", "device_id": DEVICE_ID, "connection_code": DEVICE_CONNATION_CODE}),
         qos=mqtt.QoS.AT_LEAST_ONCE
     )
     
     # 구독중인 메세지들
-    
     mqtt_connection.subscribe(
         topic=TOPIC_CONTROL,
         qos=mqtt.QoS.AT_LEAST_ONCE,
@@ -280,21 +418,62 @@ def main():
     print("메시지 대기 중")
     try:
         while True:
-            time.sleep(1)       # cpu 점유율을 낮추기 위함
+            state = GPIO.input(BUTTON_PIN)
+
+            if state == GPIO.LOW:
+                if not was_pressed:
+                    was_pressed = True
+                    press_start = time.time()
+                    print("버튼 누름 시작")
+
+                if time.time() - press_start >= 3 and not long_press_handled:
+                    print("3초 이상 버튼 눌림 → 부모 실행 & 자식 종료")
+                    long_press_handled = True
+                    
+                    
+                    mqtt_connection.publish(
+                    topic=TOPIC_STATUS,
+                    payload=json.dumps({"status": "program_off", "device_id": DEVICE_ID, "connection_code": DEVICE_CONNATION_CODE}),
+                    qos=mqtt.QoS.AT_LEAST_ONCE
+                    )
+                    recorder.stop()
+                    cont.stop_camera_stream()
+                    mqtt_connection.disconnect().result()
+                    GPIO.cleanup()
+                    time.sleep(0.1)  # GPIO 정리 후 잠시 대기
+
+                    # 부모 실행
+                    subprocess.Popen(
+                        ["sudo", "python3", "/home/kireal1017/petcalmmate_project/start_setup.py"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        preexec_fn=os.setsid
+                    )
+
+                    # 자식 종료
+                    sys.exit(0)
+
+            elif state == GPIO.HIGH and was_pressed:
+                was_pressed = False
+                long_press_handled = False
+                print("버튼 뗌")
+            time.sleep(0.01)       # cpu 점유율을 낮추기 위함
+            
+    
     except KeyboardInterrupt:
         print("연결 종료")
         
         mqtt_connection.publish(
-        topic=TOPIC_STATUS,
-        payload=json.dumps({"status":"program_off"}),
-        qos=mqtt.QoS.AT_LEAST_ONCE
+            topic=TOPIC_STATUS,
+            payload=json.dumps({"status": "program_off", "device_id": DEVICE_ID, "connection_code": DEVICE_CONNATION_CODE}),
+            qos=mqtt.QoS.AT_LEAST_ONCE
         )
         
         recorder.stop()
         cont.stop_camera_stream()
         mqtt_connection.disconnect().result()
-        
-
+        GPIO.cleanup()
 
 if __name__ == "__main__":
     main()
+
