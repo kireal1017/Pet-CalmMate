@@ -179,8 +179,8 @@ def get_sound_data():
     if not device_id:
         return jsonify({"error": "device_id가 필요합니다."}), 400
 
-    # Device 테이블에서 dog_id 조회
-    device = Device.query.filter_by(serial_number=device_id).first()
+    # Device 테이블에서 device_id 조회
+    device = Device.query.filter_by(device_id=device_id).first()
     if not device or not device.dog_id:
         return jsonify({"error": "유효하지 않거나 매핑되지 않은 device_id입니다."}), 404
 
