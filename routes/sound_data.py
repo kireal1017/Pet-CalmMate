@@ -174,10 +174,23 @@ def receive_sound_data():
 # GET /api/dog-sound : 가장 최근 사운드 데이터 조회
 @sound_data_bp.route('/dog-sound', methods=['GET'])
 def get_sound_data():
-    if latest_sound_data:
-        return jsonify(latest_sound_data), 200
+    device_id = request.args.get("device_id")
+
+    if not device_id:
+        return jsonify({"error": "device_id가 필요합니다."}), 400
+
+    # Device 테이블에서 dog_id 조회
+    device = Device.query.filter_by(serial_number=device_id).first()
+    if not device or not device.dog_id:
+        return jsonify({"error": "유효하지 않거나 매핑되지 않은 device_id입니다."}), 404
+
+    dog_id = device.dog_id
+    data = latest_sound_data.get(dog_id)
+
+    if data:
+        return jsonify(data), 200
     else:
-        return jsonify({"message": "No sound data available"}), 404
+        return jsonify({"message": "해당 device_id에 대한 사운드 데이터가 없습니다."}), 404
 
 
 # ─────────────────────────────────────────────────────────────────────────────
