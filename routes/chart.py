@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from db import db
-from models import WeightRecord, WalkRecord, Meal
+from models import WeightRecord, WalkRecord, Meal, SoundAnalysis
 from sqlalchemy import extract
 import calendar
 from datetime import datetime, timedelta
