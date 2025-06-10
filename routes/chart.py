@@ -198,7 +198,7 @@ def get_meal_daily_chart():
         return jsonify({'error': 'dog_id and date are required'}), 400
 
     try:
-        start = datetime.fromisoformat(date_str)
+        start = datetime.fromisoformat(date_str) + timedelta(hours=9)
         end = start + timedelta(days=1)
 
         records = Meal.query.filter(
@@ -282,7 +282,7 @@ def get_daily_anxiety_chart():
 
     try:
         from models import SoundAnalysis
-        start = datetime.fromisoformat(date_str)
+        start = datetime.fromisoformat(date_str) + timedelta(hours=9)
         end = start + timedelta(days=1)
 
         # 시간별 불안도 목록 초기화 (0시 ~ 23시)

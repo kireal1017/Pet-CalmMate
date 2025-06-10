@@ -24,7 +24,7 @@ def dispense_snack():
         send_mqtt_message("cmd/control", message)
 
         # 오늘 날짜의 시작과 끝 구하기
-        now = datetime.now()
+        now = datetime.now() + timedelta(hours=9)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
 
@@ -159,7 +159,7 @@ def get_today_snack_count():
 
     try:
         # 오늘 날짜 범위
-        now = datetime.now()
+        now = datetime.now() + timedelta(hours=9)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
 

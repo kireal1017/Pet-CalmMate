@@ -165,7 +165,7 @@ def receive_sound_data():
     }
 
     # 짖음 이벤트로 간주하여 알림 큐에 추가
-    enqueue_bark_alert(dog_id, datetime.utcnow())
+    enqueue_bark_alert(dog_id, datetime.utcnow() + timedelta(hours=9))
 
     return jsonify({"message": "Data received and saved"}), 200
 
@@ -229,7 +229,7 @@ def get_anxiety_records_by_date():
     try:
         # 날짜 파싱
         # 주어진 날짜의 시작 시간 (00:00:00)
-        day_start = datetime.fromisoformat(date_str)
+        day_start = datetime.fromisoformat(date_str) + timedelta(hours=9)
         # 주어진 날짜의 다음 날 시작 시간 (24:00:00)
         day_end = day_start + timedelta(days=1)
 
@@ -272,7 +272,7 @@ def get_today_bark_count():
         return jsonify({'error': 'dog_id is required'}), 400
 
     try:
-        now = datetime.now()
+        now = datetime.now() + timedelta(hours=9)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
 

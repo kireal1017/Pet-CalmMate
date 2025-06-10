@@ -20,7 +20,7 @@ def add_walk():
     try:
         walk_distance = float(data['walk_distance'])     # 거리 (ex. 1.2km)
         walk_duration = int(data['walk_duration'])       # 시간 (초 단위)
-        record_datetime = datetime.fromisoformat(data['date_time'])  # "YYYY-MM-DDTHH:MM:SS"
+        record_datetime = datetime.fromisoformat(data['date_time']) + timedelta(hours=9) # "YYYY-MM-DDTHH:MM:SS"
 
         new_record = WalkRecord(
             dog_id=data['dog_id'],
@@ -91,7 +91,7 @@ def get_walk_records_by_date():
         from datetime import datetime, timedelta
 
         # 날짜 파싱
-        day_start = datetime.fromisoformat(date_str)
+        day_start = datetime.fromisoformat(date_str) + timedelta(hours=9)
         day_end = day_start + timedelta(days=1)
 
         # 해당 날짜 범위 내의 기록 필터링

@@ -18,7 +18,7 @@ def add_meal():
     try:
         meal = Meal(
             dog_id=data['dog_id'],
-            meal_datetime=datetime.fromisoformat(data['meal_datetime']),
+            meal_datetime=datetime.fromisoformat(data['meal_datetime']) + timedelta(hours=9),
             meal_amount=int(data['meal_amount']),
             memo=data.get('memo')
         )
@@ -42,7 +42,7 @@ def get_meal_list():
         return jsonify({'error': 'dog_id and date are required'}), 400
 
     try:
-        day_start = datetime.fromisoformat(date_str)
+        day_start = datetime.fromisoformat(date_str) + timedelta(hours=9)
         day_end = day_start + timedelta(days=1)
 
         records = Meal.query.filter(
