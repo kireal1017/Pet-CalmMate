@@ -181,31 +181,3 @@ def get_today_snack_count():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# 당일 짖은 횟수
-@sound_data_bp.route('/sound-count-today', methods=['GET'])
-def get_today_bark_count():
-    dog_id = request.args.get('dog_id', type=int)
-    if not dog_id:
-        return jsonify({'error': 'dog_id is required'}), 400
-
-    try:
-        now = datetime.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
-
-        # 오늘 하루 동안의 짖음 기록 수
-        count = SoundAnalysis.query.filter(
-            SoundAnalysis.dog_id == dog_id,
-            SoundAnalysis.record_date >= today_start,
-            SoundAnalysis.record_date < today_end
-        ).count()
-
-        return jsonify({
-            'dog_id': dog_id,
-            'date': now.strftime('%Y-%m-%d'),
-            'bark_count': count
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
