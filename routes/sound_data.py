@@ -83,7 +83,7 @@ def save_to_db(dog_id, anxiety_level, sound_features, record_datetime):
     new_entry = SoundAnalysis(
         dog_id=dog_id,
         anxiety_level=anxiety_level,
-        record_datetime=record_datetime,
+        record_date=record_datetime,
         sound_features=sound_features
     )
     db.session.add(new_entry)
