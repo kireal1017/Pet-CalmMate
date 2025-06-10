@@ -258,7 +258,7 @@ def get_monthly_anxiety_chart():
                 daily_avg_anxieties.append(avg)
             else:
                 daily_avg_anxieties.append(0)  # ⬅️ 데이터 없으면 0으로 채움
-
+        print(f"[DEBUG] 응답 데이터: {daily_avg_anxieties}")
         return jsonify({
             'dog_id': dog_id,
             'year': year,
@@ -268,6 +268,7 @@ def get_monthly_anxiety_chart():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 
 
 # 일간 불안도 차트
