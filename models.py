@@ -129,18 +129,16 @@ class ChatSolution(db.Model):
 
 class Device(db.Model):
     __tablename__ = 'Device'
-    device_id     = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    serial_number = db.Column(db.String(100), unique=True, nullable=False)
-    owner_id      = db.Column(db.Integer, db.ForeignKey('User.user_id'), nullable=False)
-    push_token    = db.Column(db.String(255), nullable=False)
+    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)  # PK
+    device_id     = db.Column(db.String(100), unique=True, nullable=False)       # <- 실제 전송받는 값
+    owner_id      = db.Column(db.Integer, db.ForeignKey('User.user_id'), nullable=True)
+    push_token    = db.Column(db.String(255), nullable=True)
     dog_id        = db.Column(db.Integer, db.ForeignKey('Dog.dog_id'), nullable=True)
     created_at    = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
-    def __init__(self, serial_number, owner_id, push_token, dog_id=None):
-        self.serial_number = serial_number
-        self.owner_id = owner_id
-        self.push_token    = push_token
-        self.dog_id        = dog_id
+    def __init__(self, device_id, dog_id=None):
+        self.device_id = device_id
+        self.dog_id = dog_id
 
     def __repr__(self):
-        return f"<Device id={self.device_id} serial={self.serial_number} owner={self.owner_id}, dog={self.dog_id}>"
+        return f"<Device device_id={self.device_id}, dog_id={self.dog_id}>"
