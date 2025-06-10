@@ -129,7 +129,7 @@ def receive_sound_data():
 
     # timestamp 문자열을 datetime 객체로 변환
     try:
-        record_datetime = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+        record_datetime_obj = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return jsonify({"error": "timestamp 형식은 'YYYY-MM-DD HH:MM:SS' 이어야 합니다."}), 400
 
@@ -143,7 +143,7 @@ def receive_sound_data():
         sound_type=sound_type,
         confidence=confidence_val,
         dog_id=dog_id,
-        timestamp=record_datetime
+        timestamp=record_datetime_obj
     )
 
     # DB에 저장
@@ -151,7 +151,7 @@ def receive_sound_data():
         dog_id=dog_id,
         anxiety_level=anxiety_level,
         sound_features=sound_type,
-        record_datetime=record_datetime
+        record_datetime=record_datetime_obj
     )
 
     # latest_sound_data 갱신 (클라이언트 GET용)
