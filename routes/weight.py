@@ -82,3 +82,31 @@ def update_weight():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+# 몸무게 삭제 API
+@weight_bp.route('/weight', methods=['DELETE'])
+def delete_weight():
+    data = request.get_json()
+
+    required_fields = ['dog_id', 'date']
+    missing_fields = [field for field in required_fields if field not in data]
+
+    if missing_fields:
+        return jsonify({'error': f"Missing fields: {', '.join(missing_fields)}"}), 400
+
+    try:
+        record_date = date.fromisoformat(data['date'])
+        record = WeightRecord.query.filter_by(dog_id=data['dog_id'], date=record_date).first()
+
+        if not record:
+            return jsonify({'error': 'Weight record not found'}), 404
+
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({'message': 'Weight record deleted successfully'}), 200
+
+    except ValueError:
+        return jsonify({'error': 'Invalid date format'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
