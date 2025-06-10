@@ -235,7 +235,6 @@ def get_monthly_anxiety_chart():
         return jsonify({'error': 'dog_id, year, month are required'}), 400
 
     try:
-        from models import SoundAnalysis
         days_in_month = calendar.monthrange(year, month)[1]
         anxiety_by_day = [[] for _ in range(days_in_month)]
 
@@ -246,21 +245,26 @@ def get_monthly_anxiety_chart():
         ).all()
 
         for record in records:
-            day = record.record_date.day  # ✅ 수정됨
-            if record.anxiety_level is not None:
+            if record.anxiety_level is None:
+                continue
+            day = record.record_date.day
+            if 1 <= day <= days_in_month:
                 anxiety_by_day[day - 1].append(record.anxiety_level)
 
-        daily_avg_anxieties = [
-            round(sum(values)/len(values), 2) if values else 0
-            for values in anxiety_by_day
-        ]
+        daily_avg_anxieties = []
+        for values in anxiety_by_day:
+            if values:
+                avg = round(sum(values) / len(values), 2)
+                daily_avg_anxieties.append(avg)
+            else:
+                daily_avg_anxieties.append(0)  # ⬅️ 데이터 없으면 0으로 채움
 
         return jsonify({
             'dog_id': dog_id,
             'year': year,
             'month': month,
             'daily_avg_anxieties': daily_avg_anxieties
-        })
+        }), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -280,19 +284,25 @@ def get_daily_anxiety_chart():
         start = datetime.fromisoformat(date_str)
         end = start + timedelta(days=1)
 
+        # 시간별 불안도 목록 초기화 (0시 ~ 23시)
         hourly_anxiety = [[] for _ in range(24)]
 
+        # 해당 날짜의 기록 조회
         records = SoundAnalysis.query.filter(
             SoundAnalysis.dog_id == dog_id,
             SoundAnalysis.record_date >= start,
             SoundAnalysis.record_date < end
         ).all()
 
+        # 각 시간대에 불안도 값 추가
         for record in records:
-            hour = record.record_date.hour  # ✅ 수정됨
-            if record.anxiety_level is not None:
+            if record.anxiety_level is None:
+                continue
+            hour = record.record_date.hour
+            if 0 <= hour <= 23:
                 hourly_anxiety[hour].append(record.anxiety_level)
 
+        # 시간별 평균 불안도 계산 (없으면 0)
         hourly_avg_anxieties = [
             round(sum(values)/len(values), 2) if values else 0
             for values in hourly_anxiety
@@ -302,7 +312,9 @@ def get_daily_anxiety_chart():
             'dog_id': dog_id,
             'date': date_str,
             'hourly_avg_anxieties': hourly_avg_anxieties
-        })
+        }), 200
 
+    except ValueError:
+        return jsonify({'error': "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다."}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
