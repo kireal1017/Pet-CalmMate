@@ -148,3 +148,36 @@ def register_device():
         db.session.add(new_device)
         db.session.commit()
         return jsonify({"message": "새 기기가 성공적으로 등록되었습니다."}), 201 # 새로 생성했으므로 201 Created 반환
+
+
+# 당일 간식 준 횟수
+@device_bp.route('/snack-today', methods=['GET'])
+def get_today_snack_count():
+    dog_id = request.args.get('dog_id', type=int)
+    if not dog_id:
+        return jsonify({'error': 'dog_id is required'}), 400
+
+    try:
+        # 오늘 날짜 범위
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+
+        # 해당 강아지의 오늘 간식 중 "자동 간식" 기록만 필터
+        records = Meal.query.filter(
+            Meal.dog_id == dog_id,
+            Meal.meal_datetime >= today_start,
+            Meal.meal_datetime < today_end
+        ).all()
+
+        # meal_amount 합산
+        total_snack_amount = sum(int(record.meal_amount) for record in records)
+
+        return jsonify({
+            'dog_id': dog_id,
+            'date': now.strftime('%Y-%m-%d'),
+            'snack_count': total_snack_amount
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
