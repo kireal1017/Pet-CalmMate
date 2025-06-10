@@ -51,7 +51,7 @@ def dispense_snack():
             db.session.add(new_snack)
 
         db.session.commit()
-        return jsonify({'message': f'간식 배출에 성공했습니다. {dog_id}'}), 200
+        return jsonify({'message': '간식 배출에 성공했습니다.'}), 200
 
     except Exception as e:
         db.session.rollback()
