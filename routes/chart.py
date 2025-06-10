@@ -241,12 +241,12 @@ def get_monthly_anxiety_chart():
 
         records = SoundAnalysis.query.filter(
             SoundAnalysis.dog_id == dog_id,
-            extract('year', SoundAnalysis.record_datetime) == year,
-            extract('month', SoundAnalysis.record_datetime) == month
+            extract('year', SoundAnalysis.record_date) == year,
+            extract('month', SoundAnalysis.record_date) == month
         ).all()
 
         for record in records:
-            day = record.record_datetime.day  # ✅ 수정됨
+            day = record.record_date.day  # ✅ 수정됨
             if record.anxiety_level is not None:
                 anxiety_by_day[day - 1].append(record.anxiety_level)
 
@@ -284,12 +284,12 @@ def get_daily_anxiety_chart():
 
         records = SoundAnalysis.query.filter(
             SoundAnalysis.dog_id == dog_id,
-            SoundAnalysis.record_datetime >= start,
-            SoundAnalysis.record_datetime < end
+            SoundAnalysis.record_date >= start,
+            SoundAnalysis.record_date < end
         ).all()
 
         for record in records:
-            hour = record.record_datetime.hour  # ✅ 수정됨
+            hour = record.record_date.hour  # ✅ 수정됨
             if record.anxiety_level is not None:
                 hourly_anxiety[hour].append(record.anxiety_level)
 
