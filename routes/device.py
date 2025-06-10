@@ -129,11 +129,22 @@ def register_device():
     if not device_id or not dog_id:
         return jsonify({"error": "device_id와 dog_id는 필수입니다"}), 400
 
-    existing = Device.query.filter_by(device_id=device_id).first()
-    if existing:
-        return jsonify({"message": "이미 등록된 device_id입니다."}), 400
+    # 1. device_id로 기존 기기 찾기
+    existing_device = Device.query.filter_by(device_id=device_id).first()
 
-    new_device = Device(device_id=device_id, dog_id=dog_id)
-    db.session.add(new_device)
-    db.session.commit()
-    return jsonify({"message": "기기 등록 성공"}), 200
+    if existing_device:
+        # 2. 이미 등록된 device_id가 있다면, dog_id만 업데이트
+        #    이 경우 owner_id와 push_token은 기존 값을 유지하거나 다른 로직으로 처리
+        existing_device.dog_id = dog_id
+        # existing_device.owner_id = None # 만약 강아지 매핑 시 owner_id를 비워야 한다면 추가 (주의: nullable=False일 경우 오류)
+        db.session.commit()
+        return jsonify({"message": f"기기 '{device_id}'의 dog_id를 {dog_id}로 업데이트했습니다."}), 200
+    else:
+        # 3. 새로운 device_id라면, 새로 생성
+        #    owner_id와 push_token은 현재 요청에서 받지 않으므로 기본값(None)으로 초기화
+        #    만약 Device 모델에 serial_number 등 다른 필수 필드(nullable=False)가 있다면
+        #    여기서 해당 값들도 제공해야 합니다.
+        new_device = Device(device_id=device_id, dog_id=dog_id, owner_id=None, push_token=None) # owner_id와 push_token을 None으로 명시적 초기화
+        db.session.add(new_device)
+        db.session.commit()
+        return jsonify({"message": "새 기기가 성공적으로 등록되었습니다."}), 201 # 새로 생성했으므로 201 Created 반환
