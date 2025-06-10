@@ -1,5 +1,7 @@
 import boto3
 import subprocess
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config import RTMP_STREAM_ID, AWS_S3_REGION
 
 STREAM_NAME = RTMP_STREAM_ID
