@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "name": "냥멍케어",
+    "displayName": "냥멍케어",
+    "slug": "sanhak-pet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/dog_logo.PNG",
+    "scheme": "sanhakpet",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff",
+        "icon": "./assets/images/pet_icon.PNG"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACTIVITY_RECOGNITION", 
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "CAMERA",                  
+        "RECORD_AUDIO",             
+        "READ_EXTERNAL_STORAGE",   
+        "WRITE_EXTERNAL_STORAGE",   
+        "READ_MEDIA_IMAGES",        
+        "READ_MEDIA_VIDEO",        
+        "READ_MEDIA_AUDIO"          
+      ],
+      "package": "com.wlstjd.sanhakpet"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "사진을 찍기 위해 카메라 접근 권한이 필요합니다.",
+          "photosPermission": "사진을 선택하기 위해 앨범 접근 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "이 앱이 기기의 모션 데이터에 접근하도록 허용하시겠습니까?"
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "이 앱이 마이크에 접근하도록 허용하시겠습니까?"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "685bc22b-1b42-4f91-95fa-630630f90ce9"
+      }
+    }
+  }
+}
