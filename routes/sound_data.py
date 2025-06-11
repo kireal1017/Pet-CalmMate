@@ -129,7 +129,7 @@ def receive_sound_data():
 
     # timestamp 문자열을 datetime 객체로 변환
     try:
-        record_datetime_obj = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+        record_datetime_obj = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S") + timedelta(hours=9)
     except ValueError:
         return jsonify({"error": "timestamp 형식은 'YYYY-MM-DD HH:MM:SS' 이어야 합니다."}), 400
 
