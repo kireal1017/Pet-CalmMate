@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 from db import db
 from models import WalkRecord 
 

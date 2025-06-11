@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from db import db
 from models import Dog
 from s3_uploader import upload_file_to_s3
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 dog_bp = Blueprint('dog', __name__)

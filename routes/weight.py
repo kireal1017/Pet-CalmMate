@@ -1,6 +1,6 @@
 # weight.py
 from flask import Blueprint, request, jsonify
-from datetime import date
+from datetime import date, datetime, timedelta
 from db import db
 from models import WeightRecord
 
